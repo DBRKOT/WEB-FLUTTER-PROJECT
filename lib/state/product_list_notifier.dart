@@ -94,6 +94,18 @@ class ProductListNotifier extends ChangeNotifier {
 
   Future<Product?> findById(int id) => _repository.findById(id);
 
+  Future<Product> create(Product product) async {
+    final created = await _repository.create(product);
+    await load();
+    return created;
+  }
+
+  Future<Product> update(Product product) async {
+    final updated = await _repository.update(product);
+    await load();
+    return updated;
+  }
+
   void _safeNotify() {
     if (!_disposed) {
       notifyListeners();

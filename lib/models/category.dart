@@ -1,36 +1,28 @@
-class Brand {
+class Category {
   final int id;
   final String name;
-  final int foundedYear;
-  final String country;
-  final String email;
+  final String description;
   final DateTime? deletedAt;
 
-  const Brand({
+  const Category({
     required this.id,
     required this.name,
-    required this.foundedYear,
-    required this.country,
-    this.email = '',
+    this.description = '',
     this.deletedAt,
   });
 
   bool get isDeleted => deletedAt != null;
 
-  Brand copyWith({
+  Category copyWith({
     String? name,
-    int? foundedYear,
-    String? country,
-    String? email,
+    String? description,
     DateTime? deletedAt,
     bool clearDeletedAt = false,
   }) {
-    return Brand(
+    return Category(
       id: id,
       name: name ?? this.name,
-      foundedYear: foundedYear ?? this.foundedYear,
-      country: country ?? this.country,
-      email: email ?? this.email,
+      description: description ?? this.description,
       deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
@@ -38,18 +30,14 @@ class Brand {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'foundedYear': foundedYear,
-        'country': country,
-        'email': email,
+        'description': description,
         'deletedAt': deletedAt?.toIso8601String(),
       };
 
-  factory Brand.fromJson(Map<String, dynamic> json) => Brand(
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
-        foundedYear: json['foundedYear'] as int? ?? 0,
-        country: json['country'] as String? ?? '',
-        email: json['email'] as String? ?? '',
+        description: json['description'] as String? ?? '',
         deletedAt: json['deletedAt'] == null
             ? null
             : DateTime.tryParse(json['deletedAt'] as String),

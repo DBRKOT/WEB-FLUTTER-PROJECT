@@ -73,6 +73,14 @@ class _BrandDetailScreenState extends State<BrandDetailScreen> {
             }
           },
         ),
+        actions: [
+          if (_brand != null && !_brand!.isDeleted)
+            IconButton(
+              tooltip: 'Изменить',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => context.push('/brands/${_brand!.id}/edit'),
+            ),
+        ],
       ),
       body: LoadStateView(
         status: _status,
@@ -104,6 +112,10 @@ class _BrandDetailScreenState extends State<BrandDetailScreen> {
                               ListTile(
                                 title: const Text('Год основания'),
                                 subtitle: Text('${_brand!.foundedYear}'),
+                              ),
+                              ListTile(
+                                title: const Text('Email'),
+                                subtitle: Text(_brand!.email),
                               ),
                             ],
                           ),

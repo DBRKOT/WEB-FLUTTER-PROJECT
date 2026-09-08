@@ -11,4 +11,6 @@ abstract interface class ProductRepository {
   Future<void> hardDelete(int id);
   Future<void> restore(int id);
   Future<int> deleteMany(List<int> ids);
+  Future<bool> isSkuTaken(String sku, {int? excludeId});
+  Future<int> countBySupplier(int supplierId);
 }

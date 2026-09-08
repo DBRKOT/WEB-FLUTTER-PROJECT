@@ -1,30 +1,34 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/brand.dart';
-import '../models/brand_query.dart';
 import '../models/page_result.dart';
-import '../repositories/brand_repository.dart';
+import '../models/simple_query.dart';
 import 'load_status.dart';
 
-class BrandListNotifier extends ChangeNotifier {
-  BrandListNotifier(this._repository);
-
-  final BrandRepository _repository;
+abstract class EntityListNotifier<T> extends ChangeNotifier {
   bool _disposed = false;
-
-  BrandQuery _query = const BrandQuery();
-  PageResult<Brand> _result = PageResult.empty();
+  SimpleQuery _query = const SimpleQuery();
+  PageResult<T> _result = PageResult.empty();
   LoadStatus _status = LoadStatus.idle;
   String? _error;
   bool _failNext = false;
   final Set<int> _selected = {};
 
-  BrandQuery get query => _query;
-  PageResult<Brand> get result => _result;
+  SimpleQuery get query => _query;
+  PageResult<T> get result => _result;
   LoadStatus get status => _status;
   String? get error => _error;
   Set<int> get selected => Set.unmodifiable(_selected);
   bool get hasSelection => _selected.isNotEmpty;
+
+  Future<PageResult<T>> fetch(SimpleQuery query);
+  Future<T?> fetchById(int id);
+  Future<List<T>> fetchAll({bool includeDeleted = false});
+  Future<T> doCreate(T item);
+  Future<T> doUpdate(T item);
+  Future<void> doSoftDelete(int id);
+  Future<void> doHardDelete(int id);
+  Future<void> doRestore(int id);
+  Future<int> doDeleteMany(List<int> ids);
 
   Future<void> load() async {
     _status = LoadStatus.loading;
@@ -35,7 +39,7 @@ class BrandListNotifier extends ChangeNotifier {
         _failNext = false;
         throw Exception('Сервер временно недоступен');
       }
-      _result = await _repository.find(_query);
+      _result = await fetch(_query);
       _status = LoadStatus.success;
     } catch (e) {
       _error = 'Не удалось загрузить список: $e';
@@ -44,7 +48,7 @@ class BrandListNotifier extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> applyQuery(BrandQuery next) async {
+  Future<void> applyQuery(SimpleQuery next) async {
     _query = next;
     _selected.clear();
     await load();
@@ -59,30 +63,25 @@ class BrandListNotifier extends ChangeNotifier {
     _safeNotify();
   }
 
-  void clearSelection() {
-    _selected.clear();
-    _safeNotify();
-  }
-
   Future<void> softDelete(int id) async {
-    await _repository.softDelete(id);
+    await doSoftDelete(id);
     _selected.remove(id);
     await load();
   }
 
   Future<void> hardDelete(int id) async {
-    await _repository.hardDelete(id);
+    await doHardDelete(id);
     _selected.remove(id);
     await load();
   }
 
   Future<void> restore(int id) async {
-    await _repository.restore(id);
+    await doRestore(id);
     await load();
   }
 
   Future<void> deleteSelected() async {
-    await _repository.deleteMany(_selected.toList());
+    await doDeleteMany(_selected.toList());
     _selected.clear();
     await load();
   }
@@ -92,27 +91,25 @@ class BrandListNotifier extends ChangeNotifier {
     return load();
   }
 
-  Future<Brand?> findById(int id) => _repository.findById(id);
+  Future<T?> findById(int id) => fetchById(id);
 
-  Future<List<Brand>> findAll({bool includeDeleted = false}) =>
-      _repository.findAll(includeDeleted: includeDeleted);
+  Future<List<T>> findAll({bool includeDeleted = false}) =>
+      fetchAll(includeDeleted: includeDeleted);
 
-  Future<Brand> create(Brand brand) async {
-    final created = await _repository.create(brand);
+  Future<T> create(T item) async {
+    final created = await doCreate(item);
     await load();
     return created;
   }
 
-  Future<Brand> update(Brand brand) async {
-    final updated = await _repository.update(brand);
+  Future<T> update(T item) async {
+    final updated = await doUpdate(item);
     await load();
     return updated;
   }
 
   void _safeNotify() {
-    if (!_disposed) {
-      notifyListeners();
-    }
+    if (!_disposed) notifyListeners();
   }
 
   @override

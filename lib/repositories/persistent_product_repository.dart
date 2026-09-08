@@ -1,12 +1,84 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/field_validation_exception.dart';
 import '../models/page_result.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
 import 'product_repository.dart';
 import 'seed_data.dart';
 
-class InMemoryProductRepository implements ProductRepository {
-  final List<Product> _products = [...seedProducts];
-  int _nextId = seedProducts.length + 1;
+class PersistentProductRepository implements ProductRepository {
+  static const _key = 'products_v3';
+
+  final SharedPreferences _prefs;
+  List<Product> _products = [];
+  int _nextId = 1;
+
+  PersistentProductRepository(this._prefs) {
+    _restore();
+  }
+
+  void _restore() {
+    final raw = _prefs.getString(_key);
+    if (raw == null) {
+      _products = [...seedProducts];
+      _nextId = _maxId() + 1;
+      _persist();
+      return;
+    }
+    try {
+      final list = jsonDecode(raw) as List;
+      _products = list
+          .map((e) => Product.fromJson(e as Map<String, dynamic>))
+          .toList();
+      _nextId = _maxId() + 1;
+    } catch (_) {
+      _products = [...seedProducts];
+      _nextId = _maxId() + 1;
+      _persist();
+    }
+  }
+
+  int _maxId() {
+    if (_products.isEmpty) return 0;
+    return _products.map((p) => p.id).reduce((a, b) => a > b ? a : b);
+  }
+
+  Future<void> _persist() async {
+    await _prefs.setString(
+      _key,
+      jsonEncode(_products.map((p) => p.toJson()).toList()),
+    );
+  }
+
+  void _ensureUniqueSku(String sku, {int? excludeId}) {
+    final taken = _products.any(
+      (p) =>
+          p.sku.toLowerCase() == sku.trim().toLowerCase() &&
+          (excludeId == null || p.id != excludeId),
+    );
+    if (taken) {
+      throw FieldValidationException(
+        {'sku': 'Товар с таким артикулом уже существует'},
+      );
+    }
+  }
+
+  @override
+  Future<bool> isSkuTaken(String sku, {int? excludeId}) async {
+    return _products.any(
+      (p) =>
+          p.sku.toLowerCase() == sku.trim().toLowerCase() &&
+          (excludeId == null || p.id != excludeId),
+    );
+  }
+
+  @override
+  Future<int> countBySupplier(int supplierId) async {
+    return _products.where((p) => p.supplierId == supplierId && !p.isDeleted).length;
+  }
 
   @override
   Future<PageResult<Product>> find(ProductQuery q) async {
@@ -22,11 +94,14 @@ class InMemoryProductRepository implements ProductRepository {
           )
           .toList();
     }
-    if (q.category != null) {
-      rows = rows.where((p) => p.category == q.category).toList();
+    if (q.categoryId != null) {
+      rows = rows.where((p) => p.categoryIds.contains(q.categoryId)).toList();
     }
     if (q.brandId != null) {
-      rows = rows.where((p) => p.brandId == q.brandId).toList();
+      rows = rows.where((p) => p.brandIds.contains(q.brandId)).toList();
+    }
+    if (q.supplierId != null) {
+      rows = rows.where((p) => p.supplierId == q.supplierId).toList();
     }
     if (q.yearFrom != null) {
       rows = rows.where((p) => p.year >= q.yearFrom!).toList();
@@ -52,9 +127,9 @@ class InMemoryProductRepository implements ProductRepository {
 
   @override
   Future<Product?> findById(int id) async {
-    await Future.delayed(const Duration(milliseconds: 250));
+    await Future.delayed(const Duration(milliseconds: 150));
     try {
-      return _products.firstWhere((p) => p.id == id && !p.isDeleted);
+      return _products.firstWhere((p) => p.id == id);
     } on StateError {
       return null;
     }
@@ -62,52 +137,56 @@ class InMemoryProductRepository implements ProductRepository {
 
   @override
   Future<Product> create(Product product) async {
+    _ensureUniqueSku(product.sku);
     final created = Product(
       id: _nextId++,
       name: product.name,
       sku: product.sku,
       year: product.year,
       price: product.price,
-      brandId: product.brandId,
-      category: product.category,
+      supplierId: product.supplierId,
+      brandIds: [...product.brandIds],
+      categoryIds: [...product.categoryIds],
       stockTotal: product.stockTotal,
       stockAvailable: product.stockAvailable,
     );
     _products.add(created);
+    await _persist();
     return created;
   }
 
   @override
   Future<Product> update(Product product) async {
+    _ensureUniqueSku(product.sku, excludeId: product.id);
     final i = _products.indexWhere((p) => p.id == product.id);
     if (i == -1) {
       throw StateError('Товар ${product.id} не найден');
     }
     _products[i] = product;
+    await _persist();
     return product;
   }
 
   @override
   Future<void> softDelete(int id) async {
     final i = _products.indexWhere((p) => p.id == id);
-    if (i == -1) {
-      throw StateError('Товар $id не найден');
-    }
+    if (i == -1) throw StateError('Товар $id не найден');
     _products[i] = _products[i].copyWith(deletedAt: DateTime.now());
+    await _persist();
   }
 
   @override
   Future<void> hardDelete(int id) async {
     _products.removeWhere((p) => p.id == id);
+    await _persist();
   }
 
   @override
   Future<void> restore(int id) async {
     final i = _products.indexWhere((p) => p.id == id);
-    if (i == -1) {
-      throw StateError('Товар $id не найден');
-    }
+    if (i == -1) throw StateError('Товар $id не найден');
     _products[i] = _products[i].copyWith(clearDeletedAt: true);
+    await _persist();
   }
 
   @override
@@ -120,6 +199,7 @@ class InMemoryProductRepository implements ProductRepository {
         count++;
       }
     }
+    await _persist();
     return count;
   }
 }

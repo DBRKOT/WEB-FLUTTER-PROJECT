@@ -116,6 +116,11 @@ class _BrandListScreenState extends State<BrandListScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Новый бренд',
+        onPressed: () => context.push('/brands/new'),
+        child: const Icon(Icons.add),
+      ),
       body: Column(
         children: [
           _BrandFilters(
@@ -171,6 +176,11 @@ class _BrandListScreenState extends State<BrandListScreen> {
                           numeric: true,
                           build: (b) => Text('${b.foundedYear}'),
                         ),
+                        TableColumnSpec(
+                          label: 'Email',
+                          sortField: 'email',
+                          build: (b) => Text(b.email),
+                        ),
                       ],
                       actions: (b) => _brandActions(context, b),
                     ),
@@ -214,6 +224,11 @@ class _BrandListScreenState extends State<BrandListScreen> {
         tooltip: 'Открыть',
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/brands/${brand.id}'),
+      ),
+      IconButton(
+        tooltip: 'Изменить',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => context.push('/brands/${brand.id}/edit'),
       ),
       IconButton(
         tooltip: 'Удалить (логически)',
@@ -437,11 +452,13 @@ class _BrandCards extends StatelessWidget {
               onChanged: (_) => notifier.toggleSelection(b.id),
             ),
             title: Text(b.name),
-            subtitle: Text('${b.country} · с ${b.foundedYear} года'),
+            subtitle: Text('${b.country} · с ${b.foundedYear} года · ${b.email}'),
             onTap: () => context.push('/brands/${b.id}'),
             trailing: PopupMenuButton<String>(
               onSelected: (value) async {
                 switch (value) {
+                  case 'edit':
+                    context.push('/brands/${b.id}/edit');
                   case 'soft':
                     await notifier.softDelete(b.id);
                   case 'hard':
@@ -452,6 +469,10 @@ class _BrandCards extends StatelessWidget {
               },
               itemBuilder: (context) => [
                 if (!b.isDeleted) ...[
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Изменить'),
+                  ),
                   const PopupMenuItem(
                     value: 'soft',
                     child: Text('Удалить логически'),

@@ -8,30 +8,22 @@ import 'package:provider/provider.dart';
 import '../core/breakpoints.dart';
 import '../core/format.dart';
 import '../models/brand.dart';
+import '../models/category.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
+import '../models/supplier.dart';
 import '../repositories/seed_data.dart';
 import '../state/brand_list_notifier.dart';
+import '../state/category_list_notifier.dart';
 import '../state/load_status.dart';
 import '../state/product_list_notifier.dart';
+import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
-
-  static const categories = <String>[
-    'Смартфоны',
-    'Ноутбуки',
-    'Планшеты',
-    'Наушники',
-    'Телевизоры',
-    'Игровые приставки',
-    'Бытовая техника',
-    'Фототехника',
-    'Оргтехника',
-  ];
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
@@ -105,10 +97,39 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     final notifier = context.watch<ProductListNotifier>();
     final brands = context.watch<BrandListNotifier>().result.items;
+    final categories = context.watch<CategoryListNotifier>().result.items;
+    final suppliers = context.watch<SupplierListNotifier>().result.items;
     final brandNames = {
       for (final b in seedBrands) b.id: b.name,
       for (final b in brands) b.id: b.name,
     };
+    final categoryNames = {
+      for (final c in seedCategories) c.id: c.name,
+      for (final c in categories) c.id: c.name,
+    };
+    final supplierNames = {
+      for (final s in seedSuppliers) s.id: s.name,
+      for (final s in suppliers) s.id: s.name,
+    };
+    final allBrands = {
+      for (final b in [...seedBrands, ...brands]) b.id: b,
+    }.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final allCategories = {
+      for (final c in [...seedCategories, ...categories]) c.id: c,
+    }.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final allSuppliers = {
+      for (final s in [...seedSuppliers, ...suppliers]) s.id: s,
+    }.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    String brandsLabel(Product p) => p.brandIds
+        .map((id) => brandNames[id] ?? '#$id')
+        .join(', ');
+    String categoriesLabel(Product p) => p.categoryIds
+        .map((id) => categoryNames[id] ?? '#$id')
+        .join(', ');
 
     return Scaffold(
       appBar: AppBar(
@@ -132,11 +153,18 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Новый товар',
+        onPressed: () => context.push('/products/new'),
+        child: const Icon(Icons.add),
+      ),
       body: Column(
         children: [
           _ProductFilters(
             notifier: notifier,
-            brands: seedBrands,
+            brands: allBrands,
+            categories: allCategories,
+            suppliers: allSuppliers,
             searchController: _searchController,
             onSearchChanged: _onSearchChanged,
             onApply: _apply,
@@ -152,6 +180,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   ? _ProductCards(
                       items: notifier.result.items,
                       brandNames: brandNames,
+                      categoryNames: categoryNames,
                       selected: notifier.selected,
                     )
                   : EntityTable<Product>(
@@ -183,12 +212,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           build: (p) => Text(p.sku),
                         ),
                         TableColumnSpec(
-                          label: 'Категория',
-                          build: (p) => Text(p.category),
+                          label: 'Категории',
+                          build: (p) => Text(categoriesLabel(p)),
                         ),
                         TableColumnSpec(
-                          label: 'Бренд',
-                          build: (p) => Text(brandNames[p.brandId] ?? '—'),
+                          label: 'Бренды',
+                          build: (p) => Text(brandsLabel(p)),
+                        ),
+                        TableColumnSpec(
+                          label: 'Поставщик',
+                          build: (p) => Text(supplierNames[p.supplierId] ?? '—'),
                         ),
                         TableColumnSpec(
                           label: 'Год',
@@ -245,6 +278,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
         tooltip: 'Открыть',
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/products/${product.id}'),
+      ),
+      IconButton(
+        tooltip: 'Изменить',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => context.push('/products/${product.id}/edit'),
       ),
       IconButton(
         tooltip: 'Удалить (логически)',
@@ -336,6 +374,8 @@ class _ProductFilters extends StatelessWidget {
   const _ProductFilters({
     required this.notifier,
     required this.brands,
+    required this.categories,
+    required this.suppliers,
     required this.searchController,
     required this.onSearchChanged,
     required this.onApply,
@@ -343,6 +383,8 @@ class _ProductFilters extends StatelessWidget {
 
   final ProductListNotifier notifier;
   final List<Brand> brands;
+  final List<Category> categories;
+  final List<Supplier> suppliers;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final Future<void> Function(ProductQuery next) onApply;
@@ -373,10 +415,10 @@ class _ProductFilters extends StatelessWidget {
           ),
           SizedBox(
             width: 200,
-            child: DropdownButtonFormField<String?>(
+            child: DropdownButtonFormField<int?>(
               isExpanded: true,
               // ignore: deprecated_member_use
-              value: q.category,
+              value: q.categoryId,
               decoration: const InputDecoration(
                 labelText: 'Категория',
                 border: OutlineInputBorder(),
@@ -384,13 +426,13 @@ class _ProductFilters extends StatelessWidget {
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('Все')),
-                for (final c in ProductListScreen.categories)
+                for (final c in categories)
                   DropdownMenuItem(
-                    value: c,
-                    child: Text(c, overflow: TextOverflow.ellipsis),
+                    value: c.id,
+                    child: Text(c.name, overflow: TextOverflow.ellipsis),
                   ),
               ],
-              onChanged: (value) => onApply(q.copyWith(category: value)),
+              onChanged: (value) => onApply(q.copyWith(categoryId: value)),
             ),
           ),
           SizedBox(
@@ -413,6 +455,28 @@ class _ProductFilters extends StatelessWidget {
                   ),
               ],
               onChanged: (value) => onApply(q.copyWith(brandId: value)),
+            ),
+          ),
+          SizedBox(
+            width: 200,
+            child: DropdownButtonFormField<int?>(
+              isExpanded: true,
+              // ignore: deprecated_member_use
+              value: q.supplierId,
+              decoration: const InputDecoration(
+                labelText: 'Поставщик',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Все')),
+                for (final s in suppliers)
+                  DropdownMenuItem(
+                    value: s.id,
+                    child: Text(s.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (value) => onApply(q.copyWith(supplierId: value)),
             ),
           ),
           SizedBox(
@@ -465,11 +529,13 @@ class _ProductCards extends StatelessWidget {
   const _ProductCards({
     required this.items,
     required this.brandNames,
+    required this.categoryNames,
     required this.selected,
   });
 
   final List<Product> items;
   final Map<int, String> brandNames;
+  final Map<int, String> categoryNames;
   final Set<int> selected;
 
   @override
@@ -480,6 +546,9 @@ class _ProductCards extends StatelessWidget {
       itemCount: items.length,
       itemBuilder: (context, index) {
         final p = items[index];
+        final brands = p.brandIds.map((id) => brandNames[id] ?? '#$id').join(', ');
+        final cats =
+            p.categoryIds.map((id) => categoryNames[id] ?? '#$id').join(', ');
         return Card(
           color: p.isDeleted
               ? Theme.of(context)
@@ -494,7 +563,7 @@ class _ProductCards extends StatelessWidget {
             ),
             title: Text(p.name),
             subtitle: Text(
-              '${p.sku} · ${p.category} · ${brandNames[p.brandId] ?? '—'} · ${p.year}\n'
+              '${p.sku} · $cats · $brands · ${p.year}\n'
               '${formatPrice(p.price)}',
             ),
             isThreeLine: true,
@@ -502,6 +571,8 @@ class _ProductCards extends StatelessWidget {
             trailing: PopupMenuButton<String>(
               onSelected: (value) async {
                 switch (value) {
+                  case 'edit':
+                    context.push('/products/${p.id}/edit');
                   case 'soft':
                     await notifier.softDelete(p.id);
                   case 'hard':
@@ -512,6 +583,10 @@ class _ProductCards extends StatelessWidget {
               },
               itemBuilder: (context) => [
                 if (!p.isDeleted) ...[
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Изменить'),
+                  ),
                   const PopupMenuItem(
                     value: 'soft',
                     child: Text('Удалить логически'),
