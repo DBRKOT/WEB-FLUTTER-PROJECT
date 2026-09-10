@@ -72,32 +72,53 @@ class Product {
       };
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    final brandIds = <int>[];
-    if (json['brandIds'] is List) {
-      brandIds.addAll((json['brandIds'] as List).whereType<int>());
-    } else if (json['brandId'] is int && (json['brandId'] as int) > 0) {
+    final brandIds = <int>[
+      ..._idList(json['brandIds']),
+      ..._nestedIds(json['authors']),
+    ];
+    if (json['brandId'] is int && (json['brandId'] as int) > 0) {
       brandIds.add(json['brandId'] as int);
     }
 
-    final categoryIds = <int>[];
-    if (json['categoryIds'] is List) {
-      categoryIds.addAll((json['categoryIds'] as List).whereType<int>());
-    }
+    final categoryIds = <int>[
+      ..._idList(json['categoryIds']),
+      ..._nestedIds(json['genres']),
+    ];
+
+    final publisher = json['publisher'];
+    final supplierId = json['supplierId'] as int? ??
+        json['publisherId'] as int? ??
+        (publisher is Map ? publisher['id'] as int? : null) ??
+        1;
 
     return Product(
       id: json['id'] as int? ?? 0,
-      name: json['name'] as String? ?? '',
-      sku: json['sku'] as String? ?? '',
+      name: (json['name'] ?? json['title'] ?? '') as String,
+      sku: (json['sku'] ?? json['isbn'] ?? '') as String,
       year: json['year'] as int? ?? 0,
-      price: json['price'] as int? ?? 0,
-      supplierId: json['supplierId'] as int? ?? 1,
-      brandIds: brandIds,
-      categoryIds: categoryIds,
-      stockTotal: json['stockTotal'] as int? ?? 0,
-      stockAvailable: json['stockAvailable'] as int? ?? 0,
+      price: json['price'] as int? ?? json['pages'] as int? ?? 0,
+      supplierId: supplierId,
+      brandIds: brandIds.toSet().toList(),
+      categoryIds: categoryIds.toSet().toList(),
+      stockTotal: json['stockTotal'] as int? ?? json['copiesTotal'] as int? ?? 0,
+      stockAvailable:
+          json['stockAvailable'] as int? ?? json['copiesAvailable'] as int? ?? 0,
       deletedAt: json['deletedAt'] == null
           ? null
           : DateTime.tryParse(json['deletedAt'] as String),
     );
+  }
+
+  static List<int> _idList(dynamic value) {
+    if (value is! List) return const [];
+    return value.whereType<int>().toList();
+  }
+
+  static List<int> _nestedIds(dynamic value) {
+    if (value is! List) return const [];
+    return [
+      for (final item in value)
+        if (item is Map && item['id'] is int) item['id'] as int,
+    ];
   }
 }

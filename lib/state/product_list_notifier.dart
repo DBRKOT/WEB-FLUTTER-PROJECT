@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/api_exceptions.dart';
 import '../models/page_result.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
@@ -18,6 +20,7 @@ class ProductListNotifier extends ChangeNotifier {
   String? _error;
   bool _failNext = false;
   final Set<int> _selected = {};
+  CancelToken? _findCancel;
 
   ProductQuery get query => _query;
   PageResult<Product> get result => _result;
@@ -27,6 +30,10 @@ class ProductListNotifier extends ChangeNotifier {
   bool get hasSelection => _selected.isNotEmpty;
 
   Future<void> load() async {
+    _findCancel?.cancel('устарел');
+    final token = CancelToken();
+    _findCancel = token;
+
     _status = LoadStatus.loading;
     _error = null;
     _safeNotify();
@@ -35,9 +42,17 @@ class ProductListNotifier extends ChangeNotifier {
         _failNext = false;
         throw Exception('Сервер временно недоступен');
       }
-      _result = await _repository.find(_query);
+      _result = await _repository.find(_query, cancelToken: token);
+      if (token.isCancelled) return;
       _status = LoadStatus.success;
+    } on RequestCancelledException {
+      return;
+    } on ApiException catch (e) {
+      if (token.isCancelled) return;
+      _error = e.message;
+      _status = LoadStatus.error;
     } catch (e) {
+      if (token.isCancelled) return;
       _error = 'Не удалось загрузить список: $e';
       _status = LoadStatus.error;
     }
@@ -114,6 +129,7 @@ class ProductListNotifier extends ChangeNotifier {
 
   @override
   void dispose() {
+    _findCancel?.cancel('dispose');
     _disposed = true;
     super.dispose();
   }

@@ -3,17 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_exceptions.dart';
 import '../core/field_validation_exception.dart';
+import '../core/form_api_errors.dart';
+import '../core/reference_cache.dart';
 import '../core/validators.dart';
 import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/supplier.dart';
 import '../repositories/seed_data.dart';
-import '../state/brand_list_notifier.dart';
-import '../state/category_list_notifier.dart';
 import '../state/product_list_notifier.dart';
-import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_form_scaffold.dart';
 import '../widgets/id_chip_form_field.dart';
 
@@ -102,13 +102,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _loadError = null;
     });
     try {
-      final brandNotifier = context.read<BrandListNotifier>();
-      final categoryNotifier = context.read<CategoryListNotifier>();
-      final supplierNotifier = context.read<SupplierListNotifier>();
+      final cache = context.read<ReferenceCache>();
       final productNotifier = context.read<ProductListNotifier>();
-      final brands = await brandNotifier.findAll();
-      final categories = await categoryNotifier.findAll();
-      final suppliers = await supplierNotifier.findAll();
+      final brands = await cache.brands();
+      final categories = await cache.categories();
+      final suppliers = await cache.suppliers();
       Product? existing;
       if (widget.isEditing) {
         existing = await productNotifier.findById(widget.id!);
@@ -131,6 +129,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _existing = existing;
         _loading = false;
         _dirty = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -173,6 +177,20 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       if (!mounted) return;
       setState(() => _fieldErrors = e.errors);
       _formKey.currentState!.validate();
+    } on ValidationException catch (e) {
+      if (!mounted) return;
+      setState(() => _fieldErrors = mapApiFieldErrors(e.errors));
+      _formKey.currentState!.validate();
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

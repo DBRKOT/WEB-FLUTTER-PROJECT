@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/api_exceptions.dart';
 import '../models/page_result.dart';
 import '../models/simple_query.dart';
 import 'load_status.dart';
@@ -41,6 +42,9 @@ abstract class EntityListNotifier<T> extends ChangeNotifier {
       }
       _result = await fetch(_query);
       _status = LoadStatus.success;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _status = LoadStatus.error;
     } catch (e) {
       _error = 'Не удалось загрузить список: $e';
       _status = LoadStatus.error;

@@ -1,9 +1,14 @@
+import 'package:dio/dio.dart';
+
 import '../models/page_result.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
 
 abstract interface class ProductRepository {
-  Future<PageResult<Product>> find(ProductQuery query);
+  Future<PageResult<Product>> find(
+    ProductQuery query, {
+    CancelToken? cancelToken,
+  });
   Future<Product?> findById(int id);
   Future<Product> create(Product product);
   Future<Product> update(Product product);

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/api_exceptions.dart';
+import '../core/reference_cache.dart';
 import '../models/brand.dart';
 import '../models/brand_query.dart';
 import '../models/page_result.dart';
@@ -7,9 +9,10 @@ import '../repositories/brand_repository.dart';
 import 'load_status.dart';
 
 class BrandListNotifier extends ChangeNotifier {
-  BrandListNotifier(this._repository);
+  BrandListNotifier(this._repository, {ReferenceCache? cache}) : _cache = cache;
 
   final BrandRepository _repository;
+  final ReferenceCache? _cache;
   bool _disposed = false;
 
   BrandQuery _query = const BrandQuery();
@@ -37,6 +40,9 @@ class BrandListNotifier extends ChangeNotifier {
       }
       _result = await _repository.find(_query);
       _status = LoadStatus.success;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _status = LoadStatus.error;
     } catch (e) {
       _error = 'Не удалось загрузить список: $e';
       _status = LoadStatus.error;
@@ -66,23 +72,27 @@ class BrandListNotifier extends ChangeNotifier {
 
   Future<void> softDelete(int id) async {
     await _repository.softDelete(id);
+    _cache?.invalidateBrands();
     _selected.remove(id);
     await load();
   }
 
   Future<void> hardDelete(int id) async {
     await _repository.hardDelete(id);
+    _cache?.invalidateBrands();
     _selected.remove(id);
     await load();
   }
 
   Future<void> restore(int id) async {
     await _repository.restore(id);
+    _cache?.invalidateBrands();
     await load();
   }
 
   Future<void> deleteSelected() async {
     await _repository.deleteMany(_selected.toList());
+    _cache?.invalidateBrands();
     _selected.clear();
     await load();
   }
@@ -99,12 +109,14 @@ class BrandListNotifier extends ChangeNotifier {
 
   Future<Brand> create(Brand brand) async {
     final created = await _repository.create(brand);
+    _cache?.invalidateBrands();
     await load();
     return created;
   }
 
   Future<Brand> update(Brand brand) async {
     final updated = await _repository.update(brand);
+    _cache?.invalidateBrands();
     await load();
     return updated;
   }

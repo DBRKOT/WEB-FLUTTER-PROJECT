@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_exceptions.dart';
+import '../core/form_api_errors.dart';
 import '../core/validators.dart';
 import '../models/brand.dart';
 import '../state/brand_list_notifier.dart';
@@ -105,10 +107,21 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
       if (!mounted) return;
       setState(() => _dirty = false);
       context.pop();
+    } on ValidationException catch (e) {
+      if (!mounted) return;
+      final msg = e.errors.values.isEmpty
+          ? e.message
+          : e.errors.values.first;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось сохранить: $e')),
+        SnackBar(content: Text('Не удалось сохранить: ${apiErrorMessage(e)}')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/breakpoints.dart';
+import '../core/api_exceptions.dart';
 import '../core/field_validation_exception.dart';
 import '../models/simple_query.dart';
 import '../models/supplier.dart';
@@ -104,6 +105,16 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             ),
           ],
         ),
+      );
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('409: ${e.message}')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
       );
     } catch (e) {
       if (!mounted) return;

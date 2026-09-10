@@ -1,3 +1,4 @@
+import '../core/reference_cache.dart';
 import '../models/category.dart';
 import '../models/page_result.dart';
 import '../models/simple_query.dart';
@@ -5,9 +6,13 @@ import '../repositories/category_repository.dart';
 import 'entity_list_notifier.dart';
 
 class CategoryListNotifier extends EntityListNotifier<Category> {
-  CategoryListNotifier(this._repository);
+  CategoryListNotifier(this._repository, {ReferenceCache? cache})
+      : _cache = cache;
 
   final CategoryRepository _repository;
+  final ReferenceCache? _cache;
+
+  void _invalidate() => _cache?.invalidateCategories();
 
   @override
   Future<PageResult<Category>> fetch(SimpleQuery query) =>
@@ -21,20 +26,41 @@ class CategoryListNotifier extends EntityListNotifier<Category> {
       _repository.findAll(includeDeleted: includeDeleted);
 
   @override
-  Future<Category> doCreate(Category item) => _repository.create(item);
+  Future<Category> doCreate(Category item) async {
+    final created = await _repository.create(item);
+    _invalidate();
+    return created;
+  }
 
   @override
-  Future<Category> doUpdate(Category item) => _repository.update(item);
+  Future<Category> doUpdate(Category item) async {
+    final updated = await _repository.update(item);
+    _invalidate();
+    return updated;
+  }
 
   @override
-  Future<void> doSoftDelete(int id) => _repository.softDelete(id);
+  Future<void> doSoftDelete(int id) async {
+    await _repository.softDelete(id);
+    _invalidate();
+  }
 
   @override
-  Future<void> doHardDelete(int id) => _repository.hardDelete(id);
+  Future<void> doHardDelete(int id) async {
+    await _repository.hardDelete(id);
+    _invalidate();
+  }
 
   @override
-  Future<void> doRestore(int id) => _repository.restore(id);
+  Future<void> doRestore(int id) async {
+    await _repository.restore(id);
+    _invalidate();
+  }
 
   @override
-  Future<int> doDeleteMany(List<int> ids) => _repository.deleteMany(ids);
+  Future<int> doDeleteMany(List<int> ids) async {
+    final n = await _repository.deleteMany(ids);
+    _invalidate();
+    return n;
+  }
 }

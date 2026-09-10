@@ -46,8 +46,10 @@ class Brand {
 
   factory Brand.fromJson(Map<String, dynamic> json) => Brand(
         id: json['id'] as int? ?? 0,
-        name: json['name'] as String? ?? '',
-        foundedYear: json['foundedYear'] as int? ?? 0,
+        name: (json['name'] ?? json['fullName'] ?? '') as String,
+        foundedYear: json['foundedYear'] as int? ??
+            json['birthYear'] as int? ??
+            0,
         country: json['country'] as String? ?? '',
         email: json['email'] as String? ?? '',
         deletedAt: json['deletedAt'] == null

@@ -42,7 +42,7 @@ class Supplier {
   factory Supplier.fromJson(Map<String, dynamic> json) => Supplier(
         id: json['id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
-        country: json['country'] as String? ?? '',
+        country: (json['country'] ?? json['city'] ?? '') as String,
         phone: json['phone'] as String? ?? '',
         deletedAt: json['deletedAt'] == null
             ? null

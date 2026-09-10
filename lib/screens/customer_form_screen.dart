@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_exceptions.dart';
 import '../core/field_validation_exception.dart';
+import '../core/form_api_errors.dart';
 import '../core/validators.dart';
 import '../models/customer.dart';
 import '../state/customer_list_notifier.dart';
@@ -126,6 +128,15 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       if (!mounted) return;
       setState(() => _fieldErrors = e.errors);
       _formKey.currentState!.validate();
+    } on ValidationException catch (e) {
+      if (!mounted) return;
+      setState(() => _fieldErrors = mapApiFieldErrors(e.errors));
+      _formKey.currentState!.validate();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

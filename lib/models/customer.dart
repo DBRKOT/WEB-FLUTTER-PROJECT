@@ -19,10 +19,14 @@ class MembershipCard {
     if (json == null) {
       return const MembershipCard(number: '', issuedYear: 2024);
     }
+    final issuedAt = json['issuedAt'] as String?;
+    final issuedYear = json['issuedYear'] as int? ??
+        (issuedAt != null ? DateTime.tryParse(issuedAt)?.year : null) ??
+        2024;
     return MembershipCard(
       number: json['number'] as String? ?? '',
       level: json['level'] as String? ?? 'Standard',
-      issuedYear: json['issuedYear'] as int? ?? 2024,
+      issuedYear: issuedYear,
     );
   }
 }

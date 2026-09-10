@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/field_validation_exception.dart';
@@ -81,7 +82,10 @@ class PersistentProductRepository implements ProductRepository {
   }
 
   @override
-  Future<PageResult<Product>> find(ProductQuery q) async {
+  Future<PageResult<Product>> find(
+    ProductQuery q, {
+    CancelToken? cancelToken,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 250));
     var rows = _products.where((p) => q.includeDeleted || !p.isDeleted).toList();
     if (q.search.trim().isNotEmpty) {

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_exceptions.dart';
 import '../core/format.dart';
 import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/supplier.dart';
+import '../repositories/api_loan_service.dart';
 import '../state/brand_list_notifier.dart';
 import '../state/category_list_notifier.dart';
 import '../state/load_status.dart';
@@ -30,6 +32,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   List<Brand> _brands = const [];
   List<Category> _categories = const [];
   Supplier? _supplier;
+  bool _loanBusy = false;
 
   @override
   void initState() {
@@ -70,12 +73,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _supplier = supplier;
         _status = LoadStatus.success;
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _status = LoadStatus.error;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = 'Не удалось загрузить товар: $e';
         _status = LoadStatus.error;
       });
+    }
+  }
+
+  Future<void> _demoLoanConflict() async {
+    final product = _product;
+    if (product == null) return;
+    setState(() => _loanBusy = true);
+    final loans = context.read<ApiLoanService>();
+    try {
+      for (var i = 0; i < 40; i++) {
+        await loans.createLoan(readerId: 1, bookId: product.id);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Экземпляры ещё есть — попробуйте товар с малым остатком'),
+        ),
+      );
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('409: ${e.message}')),
+      );
+      await _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _loanBusy = false);
     }
   }
 
@@ -116,6 +156,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 brands: _brands,
                 categories: _categories,
                 supplier: _supplier,
+                loanBusy: _loanBusy,
+                onDemoConflict: _demoLoanConflict,
               ),
       ),
     );
@@ -128,12 +170,16 @@ class _ProductCard extends StatelessWidget {
     required this.brands,
     required this.categories,
     required this.supplier,
+    required this.loanBusy,
+    required this.onDemoConflict,
   });
 
   final Product product;
   final List<Brand> brands;
   final List<Category> categories;
   final Supplier? supplier;
+  final bool loanBusy;
+  final VoidCallback onDemoConflict;
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +213,22 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: loanBusy ? null : onDemoConflict,
+              icon: loanBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.warning_amber_outlined),
+              label: Text(
+                loanBusy
+                    ? 'Оформляем выдачи…'
+                    : 'Демо 409: выдать до конфликта',
               ),
             ),
           ],
