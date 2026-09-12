@@ -2,12 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import 'api_exceptions.dart';
-import 'auth_session.dart';
+import 'auth_notifier.dart';
 import 'config.dart';
 
 Dio buildDio({
   String? Function()? tokenProvider,
-  AuthSession? auth,
+  AuthNotifier? Function()? authProvider,
 }) {
   final dio = Dio(
     BaseOptions(
@@ -50,6 +50,7 @@ Dio buildDio({
         final opts = response.requestOptions;
         final alreadyRetried = opts.extra['authRetried'] == true;
         final isAuthCall = opts.path.contains('/auth/');
+        final auth = authProvider?.call();
 
         if (status == 401 && auth != null && !alreadyRetried && !isAuthCall) {
           try {
@@ -59,6 +60,7 @@ Dio buildDio({
             final retry = await dio.fetch(opts);
             return handler.resolve(retry);
           } catch (_) {
+            await auth.logout(reason: 'refresh после 401 не удался');
           }
         }
 

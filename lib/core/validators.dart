@@ -51,6 +51,18 @@ class V {
         re.hasMatch(value?.trim() ?? '') ? null : 'Некорректный адрес почты';
   }
 
+  static Validator strongPassword() {
+    return (value) {
+      final text = value ?? '';
+      if (text.length < 8) return 'Не короче 8 символов';
+      if (!RegExp(r'\d').hasMatch(text)) return 'Нужна хотя бы одна цифра';
+      if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\/;~`]').hasMatch(text)) {
+        return 'Нужен специальный символ (!@#\$% и т.п.)';
+      }
+      return null;
+    };
+  }
+
   static Validator combine(List<Validator> validators) {
     return (value) {
       for (final v in validators) {

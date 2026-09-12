@@ -10,18 +10,63 @@ import '../screens/category_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
 import '../screens/customer_list_screen.dart';
+import '../screens/forbidden_screen.dart';
+import '../screens/login_screen.dart';
+import '../screens/my_orders_screen.dart';
+import '../screens/orders_screen.dart';
 import '../screens/product_detail_screen.dart';
 import '../screens/product_form_screen.dart';
 import '../screens/product_list_screen.dart';
+import '../screens/register_screen.dart';
+import '../screens/stats_screen.dart';
 import '../screens/supplier_detail_screen.dart';
 import '../screens/supplier_form_screen.dart';
 import '../screens/supplier_list_screen.dart';
+import '../screens/users_screen.dart';
 import '../widgets/app_scaffold.dart';
+import 'auth_notifier.dart';
+import 'permissions.dart';
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter(AuthNotifier auth) {
   return GoRouter(
     initialLocation: '/products',
+    refreshListenable: auth,
+    redirect: (context, state) {
+      if (auth.isRestoring) return null;
+
+      final loggedIn = auth.isAuthenticated;
+      final target = state.matchedLocation;
+      final isPublic = target == '/login' || target == '/register';
+
+      if (!loggedIn && !isPublic) {
+        return '/login?from=${Uri.encodeComponent(state.uri.toString())}';
+      }
+      if (loggedIn && isPublic) {
+        final from = state.uri.queryParameters['from'];
+        if (from != null && from.isNotEmpty) return from;
+        return '/products';
+      }
+
+      if (loggedIn && target != '/forbidden' && !auth.canOpenPath(target)) {
+        return '/forbidden';
+      }
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => LoginScreen(
+          from: state.uri.queryParameters['from'],
+        ),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forbidden',
+        builder: (context, state) => const ForbiddenScreen(),
+      ),
       GoRoute(path: '/', redirect: (_, _) => '/products'),
       ShellRoute(
         builder: (context, state, child) {
@@ -62,6 +107,22 @@ GoRouter createAppRouter() {
             create: const CustomerFormScreen(),
             edit: (id) => CustomerFormScreen(id: id),
             detail: (id) => CustomerDetailScreen(customerId: id),
+          ),
+          GoRoute(
+            path: '/my-orders',
+            builder: (context, state) => const MyOrdersScreen(),
+          ),
+          GoRoute(
+            path: '/orders',
+            builder: (context, state) => const OrdersScreen(),
+          ),
+          GoRoute(
+            path: '/admin/users',
+            builder: (context, state) => const UsersScreen(),
+          ),
+          GoRoute(
+            path: '/admin/stats',
+            builder: (context, state) => const StatsScreen(),
           ),
         ],
       ),

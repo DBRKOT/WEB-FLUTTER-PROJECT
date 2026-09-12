@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/auth_notifier.dart';
 import '../core/breakpoints.dart';
 import '../core/format.dart';
+import '../core/permissions.dart';
 import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
@@ -135,12 +137,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
       appBar: AppBar(
         title: const Text('Каталог товаров'),
         actions: [
-          if (notifier.hasSelection)
+          if (context.watch<AuthNotifier>().canEditCatalog &&
+              notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Center(child: Text('Выбрано: ${notifier.selected.length}')),
             ),
-          if (notifier.hasSelection)
+          if (context.watch<AuthNotifier>().canEditCatalog &&
+              notifier.hasSelection)
             IconButton(
               tooltip: 'Удалить выбранные',
               onPressed: () => _confirmDeleteSelected(context),
@@ -153,11 +157,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Новый товар',
-        onPressed: () => context.push('/products/new'),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+          ? FloatingActionButton(
+              tooltip: 'Новый товар',
+              onPressed: () => context.push('/products/new'),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: Column(
         children: [
           _ProductFilters(
@@ -259,18 +265,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   List<Widget> _productActions(BuildContext context, Product product) {
     final n = context.read<ProductListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     if (product.isDeleted) {
       return [
-        IconButton(
-          tooltip: 'Восстановить',
-          icon: const Icon(Icons.restore),
-          onPressed: () => n.restore(product.id),
-        ),
-        IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, product),
-        ),
+        if (auth.canRestore)
+          IconButton(
+            tooltip: 'Восстановить',
+            icon: const Icon(Icons.restore),
+            onPressed: () => n.restore(product.id),
+          ),
+        if (auth.canHardDelete)
+          IconButton(
+            tooltip: 'Удалить навсегда',
+            icon: const Icon(Icons.delete_forever),
+            onPressed: () => _confirmHardDelete(context, product),
+          ),
       ];
     }
     return [
@@ -279,21 +288,24 @@ class _ProductListScreenState extends State<ProductListScreen> {
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/products/${product.id}'),
       ),
-      IconButton(
-        tooltip: 'Изменить',
-        icon: const Icon(Icons.edit_outlined),
-        onPressed: () => context.push('/products/${product.id}/edit'),
-      ),
-      IconButton(
-        tooltip: 'Удалить (логически)',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: () => _confirmSoftDelete(context, product),
-      ),
-      IconButton(
-        tooltip: 'Удалить навсегда',
-        icon: const Icon(Icons.delete_forever),
-        onPressed: () => _confirmHardDelete(context, product),
-      ),
+      if (auth.canEditCatalog) ...[
+        IconButton(
+          tooltip: 'Изменить',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => context.push('/products/${product.id}/edit'),
+        ),
+        IconButton(
+          tooltip: 'Удалить (логически)',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmSoftDelete(context, product),
+        ),
+      ],
+      if (auth.canHardDelete)
+        IconButton(
+          tooltip: 'Удалить навсегда',
+          icon: const Icon(Icons.delete_forever),
+          onPressed: () => _confirmHardDelete(context, product),
+        ),
     ];
   }
 
@@ -541,6 +553,7 @@ class _ProductCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notifier = context.read<ProductListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: items.length,
@@ -557,10 +570,12 @@ class _ProductCards extends StatelessWidget {
                   .withValues(alpha: 0.35)
               : null,
           child: ListTile(
-            leading: Checkbox(
-              value: selected.contains(p.id),
-              onChanged: (_) => notifier.toggleSelection(p.id),
-            ),
+            leading: auth.canEditCatalog
+                ? Checkbox(
+                    value: selected.contains(p.id),
+                    onChanged: (_) => notifier.toggleSelection(p.id),
+                  )
+                : null,
             title: Text(p.name),
             subtitle: Text(
               '${p.sku} · $cats · $brands · ${p.year}\n'
@@ -568,45 +583,50 @@ class _ProductCards extends StatelessWidget {
             ),
             isThreeLine: true,
             onTap: () => context.push('/products/${p.id}'),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) async {
-                switch (value) {
-                  case 'edit':
-                    context.push('/products/${p.id}/edit');
-                  case 'soft':
-                    await notifier.softDelete(p.id);
-                  case 'hard':
-                    await notifier.hardDelete(p.id);
-                  case 'restore':
-                    await notifier.restore(p.id);
-                }
-              },
-              itemBuilder: (context) => [
-                if (!p.isDeleted) ...[
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Изменить'),
+            trailing: !auth.canEditCatalog
+                ? null
+                : PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      switch (value) {
+                        case 'edit':
+                          context.push('/products/${p.id}/edit');
+                        case 'soft':
+                          await notifier.softDelete(p.id);
+                        case 'hard':
+                          await notifier.hardDelete(p.id);
+                        case 'restore':
+                          await notifier.restore(p.id);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (!p.isDeleted) ...[
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Изменить'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'soft',
+                          child: Text('Удалить логически'),
+                        ),
+                        if (auth.canHardDelete)
+                          const PopupMenuItem(
+                            value: 'hard',
+                            child: Text('Удалить навсегда'),
+                          ),
+                      ] else ...[
+                        if (auth.canRestore)
+                          const PopupMenuItem(
+                            value: 'restore',
+                            child: Text('Восстановить'),
+                          ),
+                        if (auth.canHardDelete)
+                          const PopupMenuItem(
+                            value: 'hard',
+                            child: Text('Удалить навсегда'),
+                          ),
+                      ],
+                    ],
                   ),
-                  const PopupMenuItem(
-                    value: 'soft',
-                    child: Text('Удалить логически'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
-                ] else ...[
-                  const PopupMenuItem(
-                    value: 'restore',
-                    child: Text('Восстановить'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
-                ],
-              ],
-            ),
           ),
         );
       },

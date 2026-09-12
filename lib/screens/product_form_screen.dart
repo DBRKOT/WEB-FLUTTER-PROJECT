@@ -189,12 +189,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(content: Text(apiErrorMessage(e))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось сохранить: $e')),
+        SnackBar(content: Text('Не удалось сохранить: ${apiErrorMessage(e)}')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/auth_notifier.dart';
 import '../core/breakpoints.dart';
+import '../core/permissions.dart';
 import '../models/brand.dart';
 import '../models/brand_query.dart';
 import '../repositories/seed_data.dart';
@@ -116,11 +118,13 @@ class _BrandListScreenState extends State<BrandListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+          ? FloatingActionButton(
         tooltip: 'Новый бренд',
         onPressed: () => context.push('/brands/new'),
         child: const Icon(Icons.add),
-      ),
+            )
+          : null,
       body: Column(
         children: [
           _BrandFilters(
@@ -205,18 +209,21 @@ class _BrandListScreenState extends State<BrandListScreen> {
 
   List<Widget> _brandActions(BuildContext context, Brand brand) {
     final n = context.read<BrandListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     if (brand.isDeleted) {
       return [
-        IconButton(
-          tooltip: 'Восстановить',
-          icon: const Icon(Icons.restore),
-          onPressed: () => n.restore(brand.id),
-        ),
-        IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, brand),
-        ),
+        if (auth.canRestore)
+          IconButton(
+            tooltip: 'Восстановить',
+            icon: const Icon(Icons.restore),
+            onPressed: () => n.restore(brand.id),
+          ),
+        if (auth.canHardDelete)
+          IconButton(
+            tooltip: 'Удалить навсегда',
+            icon: const Icon(Icons.delete_forever),
+            onPressed: () => _confirmHardDelete(context, brand),
+          ),
       ];
     }
     return [
@@ -225,21 +232,24 @@ class _BrandListScreenState extends State<BrandListScreen> {
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/brands/${brand.id}'),
       ),
-      IconButton(
-        tooltip: 'Изменить',
-        icon: const Icon(Icons.edit_outlined),
-        onPressed: () => context.push('/brands/${brand.id}/edit'),
-      ),
-      IconButton(
-        tooltip: 'Удалить (логически)',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: () => _confirmSoftDelete(context, brand),
-      ),
-      IconButton(
-        tooltip: 'Удалить навсегда',
-        icon: const Icon(Icons.delete_forever),
-        onPressed: () => _confirmHardDelete(context, brand),
-      ),
+      if (auth.canEditCatalog) ...[
+        IconButton(
+          tooltip: 'Изменить',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => context.push('/brands/${brand.id}/edit'),
+        ),
+        IconButton(
+          tooltip: 'Удалить (логически)',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmSoftDelete(context, brand),
+        ),
+      ],
+      if (auth.canHardDelete)
+        IconButton(
+          tooltip: 'Удалить навсегда',
+          icon: const Icon(Icons.delete_forever),
+          onPressed: () => _confirmHardDelete(context, brand),
+        ),
     ];
   }
 
@@ -467,7 +477,9 @@ class _BrandCards extends StatelessWidget {
                     await notifier.restore(b.id);
                 }
               },
-              itemBuilder: (context) => [
+              itemBuilder: (context) {
+                final auth = context.watch<AuthNotifier>();
+                return [
                 if (!b.isDeleted) ...[
                   const PopupMenuItem(
                     value: 'edit',
@@ -477,21 +489,25 @@ class _BrandCards extends StatelessWidget {
                     value: 'soft',
                     child: Text('Удалить логически'),
                   ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ] else ...[
-                  const PopupMenuItem(
-                    value: 'restore',
-                    child: Text('Восстановить'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canRestore)
+                    const PopupMenuItem(
+                      value: 'restore',
+                      child: Text('Восстановить'),
+                    ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ],
-              ],
+              ];
+              },
             ),
           ),
         );

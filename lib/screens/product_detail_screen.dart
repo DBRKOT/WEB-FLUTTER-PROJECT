@@ -3,17 +3,17 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
+import '../core/auth_notifier.dart';
 import '../core/format.dart';
+import '../core/permissions.dart';
+import '../core/reference_cache.dart';
 import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/supplier.dart';
 import '../repositories/api_loan_service.dart';
-import '../state/brand_list_notifier.dart';
-import '../state/category_list_notifier.dart';
 import '../state/load_status.dart';
 import '../state/product_list_notifier.dart';
-import '../state/supplier_list_notifier.dart';
 import '../widgets/load_state_view.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -49,9 +49,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     });
     try {
       final productNotifier = context.read<ProductListNotifier>();
-      final brandNotifier = context.read<BrandListNotifier>();
-      final categoryNotifier = context.read<CategoryListNotifier>();
-      final supplierNotifier = context.read<SupplierListNotifier>();
+      final cache = context.read<ReferenceCache>();
       final product = await productNotifier.findById(widget.productId);
       if (product == null) {
         if (!mounted) return;
@@ -61,9 +59,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         });
         return;
       }
-      final brands = await brandNotifier.findAll();
-      final categories = await categoryNotifier.findAll();
-      final supplier = await supplierNotifier.findById(product.supplierId);
+      final brands = await cache.brands();
+      final categories = await cache.categories();
+      final suppliers = await cache.suppliers();
+      Supplier? supplier;
+      for (final s in suppliers) {
+        if (s.id == product.supplierId) {
+          supplier = s;
+          break;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _product = product;
@@ -109,6 +114,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         SnackBar(content: Text('409: ${e.message}')),
       );
       await _load();
+    } on ForbiddenException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('403: ${e.message}')),
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,6 +131,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthNotifier>();
     return Scaffold(
       appBar: AppBar(
         title: Text(_product?.name ?? 'Карточка товара'),
@@ -135,7 +146,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           },
         ),
         actions: [
-          if (_product != null && !_product!.isDeleted)
+          if (_product != null &&
+              !_product!.isDeleted &&
+              auth.canEditCatalog)
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
@@ -157,6 +170,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 categories: _categories,
                 supplier: _supplier,
                 loanBusy: _loanBusy,
+                showConflictDemo: auth.canManageOrders,
                 onDemoConflict: _demoLoanConflict,
               ),
       ),
@@ -171,6 +185,7 @@ class _ProductCard extends StatelessWidget {
     required this.categories,
     required this.supplier,
     required this.loanBusy,
+    required this.showConflictDemo,
     required this.onDemoConflict,
   });
 
@@ -179,6 +194,7 @@ class _ProductCard extends StatelessWidget {
   final List<Category> categories;
   final Supplier? supplier;
   final bool loanBusy;
+  final bool showConflictDemo;
   final VoidCallback onDemoConflict;
 
   @override
@@ -215,22 +231,24 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              onPressed: loanBusy ? null : onDemoConflict,
-              icon: loanBusy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.warning_amber_outlined),
-              label: Text(
-                loanBusy
-                    ? 'Оформляем выдачи…'
-                    : 'Демо 409: выдать до конфликта',
+            if (showConflictDemo) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: loanBusy ? null : onDemoConflict,
+                icon: loanBusy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.warning_amber_outlined),
+                label: Text(
+                  loanBusy
+                      ? 'Оформляем выдачи…'
+                      : 'Демо 409: выдать до конфликта',
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

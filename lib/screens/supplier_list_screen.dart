@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../core/auth_notifier.dart';
+import '../core/permissions.dart';
 
 import '../core/breakpoints.dart';
 import '../core/api_exceptions.dart';
@@ -146,11 +148,13 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+          ? FloatingActionButton(
         tooltip: 'Новый поставщик',
         onPressed: () => context.push('/suppliers/new'),
         child: const Icon(Icons.add),
-      ),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -251,18 +255,21 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
   List<Widget> _actions(BuildContext context, Supplier supplier) {
     final n = context.read<SupplierListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     if (supplier.isDeleted) {
       return [
-        IconButton(
-          tooltip: 'Восстановить',
-          icon: const Icon(Icons.restore),
-          onPressed: () => n.restore(supplier.id),
-        ),
-        IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, supplier),
-        ),
+        if (auth.canRestore)
+          IconButton(
+            tooltip: 'Восстановить',
+            icon: const Icon(Icons.restore),
+            onPressed: () => n.restore(supplier.id),
+          ),
+        if (auth.canHardDelete)
+          IconButton(
+            tooltip: 'Удалить навсегда',
+            icon: const Icon(Icons.delete_forever),
+            onPressed: () => _confirmHardDelete(context, supplier),
+          ),
       ];
     }
     return [
@@ -271,21 +278,24 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/suppliers/${supplier.id}'),
       ),
-      IconButton(
-        tooltip: 'Изменить',
-        icon: const Icon(Icons.edit_outlined),
-        onPressed: () => context.push('/suppliers/${supplier.id}/edit'),
-      ),
-      IconButton(
-        tooltip: 'Удалить (логически)',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: () => _confirmSoftDelete(context, supplier),
-      ),
-      IconButton(
-        tooltip: 'Удалить навсегда',
-        icon: const Icon(Icons.delete_forever),
-        onPressed: () => _confirmHardDelete(context, supplier),
-      ),
+      if (auth.canEditCatalog) ...[
+        IconButton(
+          tooltip: 'Изменить',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => context.push('/suppliers/${supplier.id}/edit'),
+        ),
+        IconButton(
+          tooltip: 'Удалить (логически)',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmSoftDelete(context, supplier),
+        ),
+      ],
+      if (auth.canHardDelete)
+        IconButton(
+          tooltip: 'Удалить навсегда',
+          icon: const Icon(Icons.delete_forever),
+          onPressed: () => _confirmHardDelete(context, supplier),
+        ),
     ];
   }
 
@@ -426,28 +436,34 @@ class _SupplierCards extends StatelessWidget {
                     await notifier.restore(s.id);
                 }
               },
-              itemBuilder: (context) => [
+              itemBuilder: (context) {
+                final auth = context.watch<AuthNotifier>();
+                return [
                 if (!s.isDeleted) ...[
                   const PopupMenuItem(value: 'edit', child: Text('Изменить')),
                   const PopupMenuItem(
                     value: 'soft',
                     child: Text('Удалить логически'),
                   ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ] else ...[
-                  const PopupMenuItem(
-                    value: 'restore',
-                    child: Text('Восстановить'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canRestore)
+                    const PopupMenuItem(
+                      value: 'restore',
+                      child: Text('Восстановить'),
+                    ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ],
-              ],
+              ];
+              },
             ),
           ),
         );

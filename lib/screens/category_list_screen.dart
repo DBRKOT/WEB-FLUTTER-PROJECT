@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../core/auth_notifier.dart';
+import '../core/permissions.dart';
 
 import '../core/breakpoints.dart';
 import '../models/category.dart';
@@ -106,11 +108,13 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+          ? FloatingActionButton(
         tooltip: 'Новая категория',
         onPressed: () => context.push('/categories/new'),
         child: const Icon(Icons.add),
-      ),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -210,18 +214,21 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
 
   List<Widget> _actions(BuildContext context, Category category) {
     final n = context.read<CategoryListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     if (category.isDeleted) {
       return [
-        IconButton(
-          tooltip: 'Восстановить',
-          icon: const Icon(Icons.restore),
-          onPressed: () => n.restore(category.id),
-        ),
-        IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, category),
-        ),
+        if (auth.canRestore)
+          IconButton(
+            tooltip: 'Восстановить',
+            icon: const Icon(Icons.restore),
+            onPressed: () => n.restore(category.id),
+          ),
+        if (auth.canHardDelete)
+          IconButton(
+            tooltip: 'Удалить навсегда',
+            icon: const Icon(Icons.delete_forever),
+            onPressed: () => _confirmHardDelete(context, category),
+          ),
       ];
     }
     return [
@@ -230,21 +237,24 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/categories/${category.id}'),
       ),
-      IconButton(
-        tooltip: 'Изменить',
-        icon: const Icon(Icons.edit_outlined),
-        onPressed: () => context.push('/categories/${category.id}/edit'),
-      ),
-      IconButton(
-        tooltip: 'Удалить (логически)',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: () => _confirmSoftDelete(context, category),
-      ),
-      IconButton(
-        tooltip: 'Удалить навсегда',
-        icon: const Icon(Icons.delete_forever),
-        onPressed: () => _confirmHardDelete(context, category),
-      ),
+      if (auth.canEditCatalog) ...[
+        IconButton(
+          tooltip: 'Изменить',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => context.push('/categories/${category.id}/edit'),
+        ),
+        IconButton(
+          tooltip: 'Удалить (логически)',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmSoftDelete(context, category),
+        ),
+      ],
+      if (auth.canHardDelete)
+        IconButton(
+          tooltip: 'Удалить навсегда',
+          icon: const Icon(Icons.delete_forever),
+          onPressed: () => _confirmHardDelete(context, category),
+        ),
     ];
   }
 
@@ -371,28 +381,34 @@ class _CategoryCards extends StatelessWidget {
                     await notifier.restore(c.id);
                 }
               },
-              itemBuilder: (context) => [
+              itemBuilder: (context) {
+                final auth = context.watch<AuthNotifier>();
+                return [
                 if (!c.isDeleted) ...[
                   const PopupMenuItem(value: 'edit', child: Text('Изменить')),
                   const PopupMenuItem(
                     value: 'soft',
                     child: Text('Удалить логически'),
                   ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ] else ...[
-                  const PopupMenuItem(
-                    value: 'restore',
-                    child: Text('Восстановить'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hard',
-                    child: Text('Удалить навсегда'),
-                  ),
+                  if (auth.canRestore)
+                    const PopupMenuItem(
+                      value: 'restore',
+                      child: Text('Восстановить'),
+                    ),
+                  if (auth.canHardDelete)
+                    const PopupMenuItem(
+                      value: 'hard',
+                      child: Text('Удалить навсегда'),
+                    ),
                 ],
-              ],
+              ];
+              },
             ),
           ),
         );

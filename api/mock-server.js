@@ -148,8 +148,8 @@ function seed() {
   makeLoan(3, 11, -30, 14, true); // возвращена (LG OLED)
 
   push('users', { username: 'admin', passwordHash: hash('admin123'), fullName: 'Администратор ТехноМаркет', email: 'admin@technomarket.local', role: 'admin', readerId: null });
-  push('users', { username: 'librarian', passwordHash: hash('librarian123'), fullName: 'Менеджер склада', email: 'manager@technomarket.local', role: 'librarian', readerId: null });
-  push('users', { username: 'reader', passwordHash: hash('reader123'), fullName: 'Иван Петров', email: 'ivan.petrov@mail.ru', role: 'reader', readerId: 1 });
+  push('users', { username: 'manager', passwordHash: hash('manager123'), fullName: 'Менеджер магазина', email: 'manager@technomarket.local', role: 'librarian', readerId: null });
+  push('users', { username: 'client', passwordHash: hash('client123'), fullName: 'Иван Петров', email: 'ivan.petrov@mail.ru', role: 'reader', readerId: 1 });
 }
 
 function push(collection, obj) {
@@ -620,6 +620,27 @@ async function handle(req, res, url) {
     return send(res, 200, expandLoan(loan));
   }
 
+  m = path.match(/^\/api\/loans\/(\d+)\/extend$/);
+  if (m && method === 'POST') {
+    if (!user) return fail(res, 401, 'Требуется аутентификация');
+    const loan = db.loans.find((l) => l.id === Number(m[1]) && !l.deletedAt);
+    if (!loan) return fail(res, 404, 'Выдача не найдена');
+    if (loan.returnedAt) return fail(res, 409, 'Нельзя продлить закрытую выдачу');
+
+    // Клиент (reader) — только свои заказы; менеджер/админ — любые.
+    if (user.role === 'reader' && loan.readerId !== user.readerId) {
+      return fail(res, 403, 'Недостаточно прав для продления чужого заказа');
+    }
+    if (user.role !== 'reader' && !requireRole(res, user, 'librarian')) return;
+
+    const body = await readBody(req);
+    const days = Math.max(1, Number((body && body.days) || 14));
+    const base = new Date(loan.dueAt);
+    base.setUTCDate(base.getUTCDate() + days);
+    loan.dueAt = base.toISOString();
+    return send(res, 200, expandLoan(loan));
+  }
+
   // ── единообразный CRUD ──
   m = path.match(/^\/api\/([a-z]+)(?:\/(\d+))?(?:\/(restore))?$/);
   const bulk = path.match(/^\/api\/([a-z]+)\/bulk-delete$/);
@@ -813,7 +834,7 @@ server.listen(PORT, () => {
   console.log(`  Разрешённый источник: ${ORIGIN}`);
   console.log(`  Срок жизни токена:  ${ACCESS_TTL} с`);
   console.log('');
-  console.log('  Учётные записи:  admin/admin123   librarian/librarian123   reader/reader123');
+  console.log('  Учётные записи:  admin/admin123   manager/manager123   client/client123');
   console.log('  Сброс данных:    POST /api/__reset');
   console.log('  Задержка ответа: любой запрос с ?__delay=1500');
   console.log('  Ошибка по требованию: любой запрос с ?__fail=500');
