@@ -10,22 +10,22 @@ import 'seed_data.dart';
 
 class PersistentCustomerRepository implements CustomerRepository {
   PersistentCustomerRepository(SharedPreferences prefs)
-      : _store = PrefsListStore<Customer>(
-          prefs: prefs,
-          key: 'customers_v1',
-          seed: seedCustomers,
-          fromJson: Customer.fromJson,
-          toJson: (c) => c.toJson(),
-          idOf: (c) => c.id,
-          withId: (c, id) => Customer(
-            id: id,
-            fullName: c.fullName,
-            email: c.email,
-            phone: c.phone,
-            card: c.card,
-            deletedAt: c.deletedAt,
-          ),
-        );
+    : _store = PrefsListStore<Customer>(
+        prefs: prefs,
+        key: 'customers_v1',
+        seed: seedCustomers,
+        fromJson: Customer.fromJson,
+        toJson: (c) => c.toJson(),
+        idOf: (c) => c.id,
+        withId: (c, id) => Customer(
+          id: id,
+          fullName: c.fullName,
+          email: c.email,
+          phone: c.phone,
+          card: c.card,
+          deletedAt: c.deletedAt,
+        ),
+      );
 
   final PrefsListStore<Customer> _store;
 
@@ -36,9 +36,9 @@ class PersistentCustomerRepository implements CustomerRepository {
           (excludeId == null || c.id != excludeId),
     );
     if (taken) {
-      throw FieldValidationException(
-        {'email': 'Клиент с таким email уже существует'},
-      );
+      throw FieldValidationException({
+        'email': 'Клиент с таким email уже существует',
+      });
     }
   }
 
@@ -63,8 +63,9 @@ class PersistentCustomerRepository implements CustomerRepository {
           c.card.number.toLowerCase().contains(needle),
       compare: (a, b) => switch (q.sortField) {
         'email' => a.email.toLowerCase().compareTo(b.email.toLowerCase()),
-        'fullName' =>
-          a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+        'fullName' => a.fullName.toLowerCase().compareTo(
+          b.fullName.toLowerCase(),
+        ),
         _ => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
       },
     );
@@ -72,9 +73,7 @@ class PersistentCustomerRepository implements CustomerRepository {
 
   @override
   Future<List<Customer>> findAll({bool includeDeleted = false}) async {
-    return _store.items
-        .where((c) => includeDeleted || !c.isDeleted)
-        .toList()
+    return _store.items.where((c) => includeDeleted || !c.isDeleted).toList()
       ..sort(
         (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
       );

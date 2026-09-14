@@ -35,9 +35,9 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
       _error = null;
     });
     try {
-      final supplier = await context
-          .read<SupplierListNotifier>()
-          .findById(widget.supplierId);
+      final supplier = await context.read<SupplierListNotifier>().findById(
+        widget.supplierId,
+      );
       if (!mounted) return;
       setState(() {
         _supplier = supplier;
@@ -58,6 +58,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
       appBar: AppBar(
         title: Text(_supplier?.name ?? 'Поставщик'),
         leading: IconButton(
+          tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {
@@ -72,8 +73,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () =>
-                  context.push('/suppliers/${_supplier!.id}/edit'),
+              onPressed: () => context.push('/suppliers/${_supplier!.id}/edit'),
             ),
         ],
       ),

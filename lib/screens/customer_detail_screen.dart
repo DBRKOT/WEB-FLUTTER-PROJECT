@@ -35,9 +35,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       _error = null;
     });
     try {
-      final customer = await context
-          .read<CustomerListNotifier>()
-          .findById(widget.customerId);
+      final customer = await context.read<CustomerListNotifier>().findById(
+        widget.customerId,
+      );
       if (!mounted) return;
       setState(() {
         _customer = customer;
@@ -58,6 +58,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       appBar: AppBar(
         title: Text(_customer?.fullName ?? 'Клиент'),
         leading: IconButton(
+          tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {
@@ -72,8 +73,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () =>
-                  context.push('/customers/${_customer!.id}/edit'),
+              onPressed: () => context.push('/customers/${_customer!.id}/edit'),
             ),
         ],
       ),

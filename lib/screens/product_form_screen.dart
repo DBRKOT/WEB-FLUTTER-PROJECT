@@ -183,14 +183,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _formKey.currentState!.validate();
     } on ConflictException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(apiErrorMessage(e))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,8 +211,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       loadError: _loadError,
       onRetry: _bootstrap,
       onSubmit: _submit,
-      submitLabel:
-          widget.isEditing ? 'Сохранить изменения' : 'Создать товар',
+      submitLabel: widget.isEditing ? 'Сохранить изменения' : 'Создать товар',
       fields: [
         FormFieldSpec(
           label: 'Название',
@@ -295,9 +292,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               : 'Бренды (доступны для выбранного поставщика)',
           emptyError: 'Выберите хотя бы один бренд',
           initialValue: _brandIds,
-          options: [
-            for (final b in _availableBrands) (id: b.id, name: b.name),
-          ],
+          options: [for (final b in _availableBrands) (id: b.id, name: b.name)],
           onSaved: (value) => _brandIds = value ?? [],
           onChanged: (value) {
             _brandIds = value;

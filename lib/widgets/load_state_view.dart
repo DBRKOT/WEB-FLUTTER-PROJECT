@@ -23,51 +23,44 @@ class LoadStateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (status) {
-      LoadStatus.idle || LoadStatus.loading => const Center(
-          child: CircularProgressIndicator(),
-        ),
+      LoadStatus.idle ||
+      LoadStatus.loading => const Center(child: CircularProgressIndicator()),
       LoadStatus.error => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  error ?? 'Ошибка',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: onRetry,
-                  child: const Text('Повторить'),
-                ),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 12),
+              Text(error ?? 'Ошибка', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+            ],
           ),
         ),
+      ),
       LoadStatus.success when isEmpty => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.inbox_outlined,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: 12),
-                Text(emptyMessage, textAlign: TextAlign.center),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.inbox_outlined,
+                size: 48,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(height: 12),
+              Text(emptyMessage, textAlign: TextAlign.center),
+            ],
           ),
         ),
+      ),
       LoadStatus.success => child,
     };
   }

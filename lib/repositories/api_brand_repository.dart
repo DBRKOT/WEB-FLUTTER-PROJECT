@@ -82,8 +82,8 @@ class ApiBrandRepository implements BrandRepository {
   Future<int> deleteMany(List<int> ids) => _api.deleteMany(ids);
 
   Map<String, dynamic> _toAuthorBody(Brand brand) => {
-        'fullName': brand.name,
-        'birthYear': brand.foundedYear,
-        'country': brand.country,
-      };
+    'fullName': brand.name,
+    'birthYear': brand.foundedYear,
+    'country': brand.country,
+  };
 }

@@ -37,9 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _submitting = true);
     try {
       await context.read<AuthNotifier>().login(
-            username: _usernameController.text,
-            password: _passwordController.text,
-          );
+        username: _usernameController.text,
+        password: _passwordController.text,
+      );
       if (!mounted) return;
       final from = widget.from;
       if (from != null && from.isNotEmpty && from != '/login') {
@@ -110,8 +110,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Пароль',
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          tooltip: _obscure
+                              ? 'Показать пароль'
+                              : 'Скрыть пароль',
+                          onPressed: () => setState(() => _obscure = !_obscure),
                           icon: Icon(
                             _obscure
                                 ? Icons.visibility_outlined

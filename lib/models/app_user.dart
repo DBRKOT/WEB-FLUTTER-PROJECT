@@ -12,23 +12,22 @@ enum UserRole {
   }
 
   String get apiValue => switch (this) {
-        UserRole.admin => 'admin',
-        UserRole.librarian => 'librarian',
-        UserRole.reader => 'reader',
-      };
-
+    UserRole.admin => 'admin',
+    UserRole.librarian => 'librarian',
+    UserRole.reader => 'reader',
+  };
 
   String get label => switch (this) {
-        UserRole.admin => 'Администратор',
-        UserRole.librarian => 'Менеджер',
-        UserRole.reader => 'Клиент',
-      };
+    UserRole.admin => 'Администратор',
+    UserRole.librarian => 'Менеджер',
+    UserRole.reader => 'Клиент',
+  };
 
   int get level => switch (this) {
-        UserRole.reader => 1,
-        UserRole.librarian => 2,
-        UserRole.admin => 3,
-      };
+    UserRole.reader => 1,
+    UserRole.librarian => 2,
+    UserRole.admin => 3,
+  };
 }
 
 class AppUser {
@@ -70,20 +69,20 @@ class AppUser {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'username': username,
-        'fullName': fullName,
-        'email': email,
-        'role': role.apiValue,
-        'readerId': readerId,
-      };
+    'id': id,
+    'username': username,
+    'fullName': fullName,
+    'email': email,
+    'role': role.apiValue,
+    'readerId': readerId,
+  };
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
-        id: json['id'] as int? ?? 0,
-        username: json['username'] as String? ?? '',
-        fullName: json['fullName'] as String? ?? '',
-        email: json['email'] as String? ?? '',
-        role: UserRole.fromApi(json['role'] as String?),
-        readerId: json['readerId'] as int?,
-      );
+    id: json['id'] as int? ?? 0,
+    username: json['username'] as String? ?? '',
+    fullName: json['fullName'] as String? ?? '',
+    email: json['email'] as String? ?? '',
+    role: UserRole.fromApi(json['role'] as String?),
+    readerId: json['readerId'] as int?,
+  );
 }

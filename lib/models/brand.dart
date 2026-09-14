@@ -36,24 +36,22 @@ class Brand {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'foundedYear': foundedYear,
-        'country': country,
-        'email': email,
-        'deletedAt': deletedAt?.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'foundedYear': foundedYear,
+    'country': country,
+    'email': email,
+    'deletedAt': deletedAt?.toIso8601String(),
+  };
 
   factory Brand.fromJson(Map<String, dynamic> json) => Brand(
-        id: json['id'] as int? ?? 0,
-        name: (json['name'] ?? json['fullName'] ?? '') as String,
-        foundedYear: json['foundedYear'] as int? ??
-            json['birthYear'] as int? ??
-            0,
-        country: json['country'] as String? ?? '',
-        email: json['email'] as String? ?? '',
-        deletedAt: json['deletedAt'] == null
-            ? null
-            : DateTime.tryParse(json['deletedAt'] as String),
-      );
+    id: json['id'] as int? ?? 0,
+    name: (json['name'] ?? json['fullName'] ?? '') as String,
+    foundedYear: json['foundedYear'] as int? ?? json['birthYear'] as int? ?? 0,
+    country: json['country'] as String? ?? '',
+    email: json['email'] as String? ?? '',
+    deletedAt: json['deletedAt'] == null
+        ? null
+        : DateTime.tryParse(json['deletedAt'] as String),
+  );
 }

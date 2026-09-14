@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
 import '../core/auth_notifier.dart';
+import '../core/breakpoints.dart';
 import '../core/permissions.dart';
 import '../models/loan_order.dart';
 import '../repositories/api_loan_service.dart';
@@ -71,12 +72,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       await _load();
     } on ForbiddenException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('403: ${e.message}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('403: ${e.message}')));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -101,12 +102,36 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
             final o = _items[i];
+            final compact = screenSizeOf(context) == ScreenSize.compact;
+            if (compact) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        o.productName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('До ${_fmtDate(o.dueAt)} · ${o.status}'),
+                      if (o.isOpen) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => _extend(o),
+                          child: const Text('Продлить'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }
             return Card(
               child: ListTile(
                 title: Text(o.productName),
-                subtitle: Text(
-                  'До ${_fmtDate(o.dueAt)} · ${o.status}',
-                ),
+                subtitle: Text('До ${_fmtDate(o.dueAt)} · ${o.status}'),
                 trailing: o.isOpen
                     ? TextButton(
                         onPressed: () => _extend(o),

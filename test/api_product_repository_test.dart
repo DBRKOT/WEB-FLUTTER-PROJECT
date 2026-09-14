@@ -38,9 +38,7 @@ class _MockAdapter implements HttpClientAdapter {
   }
 }
 
-Dio _dioWith(
-  Future<ResponseBody> Function(RequestOptions options) handler,
-) {
+Dio _dioWith(Future<ResponseBody> Function(RequestOptions options) handler) {
   final dio = Dio(
     BaseOptions(
       baseUrl: 'http://test/api',
@@ -84,23 +82,22 @@ Map<String, dynamic> _book({
   int id = 1,
   String title = 'iPhone 15 Pro',
   String isbn = 'TM-000001',
-}) =>
-    {
-      'id': id,
-      'title': title,
-      'isbn': isbn,
-      'year': 2023,
-      'pages': 129990,
-      'publisherId': 1,
-      'authors': [
-        {'id': 1, 'fullName': 'Apple'}
-      ],
-      'genres': [
-        {'id': 1, 'name': 'Смартфоны'}
-      ],
-      'copiesTotal': 20,
-      'copiesAvailable': 14,
-    };
+}) => {
+  'id': id,
+  'title': title,
+  'isbn': isbn,
+  'year': 2023,
+  'pages': 129990,
+  'publisherId': 1,
+  'authors': [
+    {'id': 1, 'fullName': 'Apple'},
+  ],
+  'genres': [
+    {'id': 1, 'name': 'Смартфоны'},
+  ],
+  'copiesTotal': 20,
+  'copiesAvailable': 14,
+};
 
 void main() {
   test('find парсит page/size/total и query-параметры', () async {
@@ -148,13 +145,10 @@ void main() {
   test('create пробрасывает ValidationException (422)', () async {
     final repo = ApiProductRepository(
       _dioWith(
-        (_) async => _json(
-          {
-            'message': 'Ошибка валидации',
-            'errors': {'isbn': 'ISBN уже занят'},
-          },
-          status: 422,
-        ),
+        (_) async => _json({
+          'message': 'Ошибка валидации',
+          'errors': {'isbn': 'ISBN уже занят'},
+        }, status: 422),
       ),
     );
 
@@ -185,9 +179,7 @@ void main() {
 
   test('findById возвращает null при 404', () async {
     final repo = ApiProductRepository(
-      _dioWith(
-        (_) async => _json({'message': 'Не найдено'}, status: 404),
-      ),
+      _dioWith((_) async => _json({'message': 'Не найдено'}, status: 404)),
     );
 
     expect(await repo.findById(999), isNull);

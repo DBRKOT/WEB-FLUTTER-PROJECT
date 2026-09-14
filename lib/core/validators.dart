@@ -2,8 +2,7 @@ typedef Validator = String? Function(String?);
 
 class V {
   static Validator required([String message = 'Поле обязательно']) {
-    return (value) =>
-        (value == null || value.trim().isEmpty) ? message : null;
+    return (value) => (value == null || value.trim().isEmpty) ? message : null;
   }
 
   static Validator length({int min = 0, int max = 255}) {
@@ -25,7 +24,9 @@ class V {
     };
   }
 
-  static Validator positiveInt([String message = 'Число должно быть больше 0']) {
+  static Validator positiveInt([
+    String message = 'Число должно быть больше 0',
+  ]) {
     return (value) {
       final n = int.tryParse(value?.trim() ?? '');
       if (n == null) return 'Введите целое число';

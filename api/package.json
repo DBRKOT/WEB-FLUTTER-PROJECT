@@ -1,0 +1,13 @@
+{
+  "name": "technomarket-mock-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Учебный mock API для ТехноМаркет ()",
+  "main": "mock-server.js",
+  "scripts": {
+    "start": "node mock-server.js --origin *"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

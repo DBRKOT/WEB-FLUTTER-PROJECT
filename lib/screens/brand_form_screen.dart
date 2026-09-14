@@ -64,8 +64,9 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
       _loadError = null;
     });
     try {
-      final existing =
-          await context.read<BrandListNotifier>().findById(widget.id!);
+      final existing = await context.read<BrandListNotifier>().findById(
+        widget.id!,
+      );
       if (existing == null) throw StateError('Бренд не найден');
       _nameController.text = existing.name;
       _countryController.text = existing.country;
@@ -109,15 +110,12 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
       context.pop();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      final msg = e.errors.values.isEmpty
-          ? e.message
-          : e.errors.values.first;
+      final msg = e.errors.values.isEmpty ? e.message : e.errors.values.first;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,8 +138,7 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
       loadError: _loadError,
       onRetry: _bootstrap,
       onSubmit: _submit,
-      submitLabel:
-          widget.isEditing ? 'Сохранить изменения' : 'Создать бренд',
+      submitLabel: widget.isEditing ? 'Сохранить изменения' : 'Создать бренд',
       fields: [
         FormFieldSpec(
           label: 'Название',
@@ -177,10 +174,7 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите email'),
-            V.email(),
-          ]),
+          validator: V.combine([V.required('Укажите email'), V.email()]),
         ),
       ],
     );

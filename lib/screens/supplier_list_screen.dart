@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../core/auth_notifier.dart';
 import '../core/permissions.dart';
 
@@ -16,6 +17,7 @@ import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
+import '../widgets/table_cell_text.dart';
 
 class SupplierListScreen extends StatefulWidget {
   const SupplierListScreen({super.key});
@@ -88,9 +90,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     });
   }
 
-  Future<void> _runDelete(
-    Future<void> Function() action,
-  ) async {
+  Future<void> _runDelete(Future<void> Function() action) async {
     try {
       await action();
     } on FieldValidationException catch (e) {
@@ -110,19 +110,16 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
       );
     } on ConflictException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('409: ${e.message}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('409: ${e.message}')));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Ошибка удаления: $e')));
     }
   }
 
@@ -150,9 +147,9 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
       ),
       floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
           ? FloatingActionButton(
-        tooltip: 'Новый поставщик',
-        onPressed: () => context.push('/suppliers/new'),
-        child: const Icon(Icons.add),
+              tooltip: 'Новый поставщик',
+              onPressed: () => context.push('/suppliers/new'),
+              child: const Icon(Icons.add),
             )
           : null,
       body: Column(
@@ -221,16 +218,17 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                         TableColumnSpec(
                           label: 'Название',
                           sortField: 'name',
-                          build: (s) => Text(s.name),
+                          build: (s) => tableCellText(s.name),
                         ),
                         TableColumnSpec(
                           label: 'Страна',
                           sortField: 'country',
-                          build: (s) => Text(s.country),
+                          build: (s) => tableCellText(s.country),
                         ),
                         TableColumnSpec(
                           label: 'Телефон',
-                          build: (s) => Text(s.phone.isEmpty ? '—' : s.phone),
+                          build: (s) =>
+                              tableCellText(s.phone.isEmpty ? '—' : s.phone),
                         ),
                       ],
                       actions: (s) => _actions(context, s),
@@ -245,8 +243,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               total: notifier.result.total,
               size: q.size,
               onPageChanged: (page) => _apply(q.copyWith(page: page)),
-              onSizeChanged: (size) =>
-                  _apply(q.copyWith(size: size, page: 1)),
+              onSizeChanged: (size) => _apply(q.copyWith(size: size, page: 1)),
             ),
         ],
       ),
@@ -404,10 +401,8 @@ class _SupplierCards extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 6),
           color: s.isDeleted
-              ? Theme.of(context)
-                  .colorScheme
-                  .errorContainer
-                  .withValues(alpha: 0.35)
+              ? Theme.of(context).colorScheme.errorContainer
+                    .withValues(alpha: 0.35)
               : null,
           child: ListTile(
             dense: true,
@@ -417,10 +412,7 @@ class _SupplierCards extends StatelessWidget {
             ),
             title: Text(s.name),
             subtitle: Text(
-              [
-                s.country,
-                if (s.phone.isNotEmpty) s.phone,
-              ].join(' · '),
+              [s.country, if (s.phone.isNotEmpty) s.phone].join(' · '),
             ),
             onTap: () => context.push('/suppliers/${s.id}'),
             trailing: PopupMenuButton<String>(
@@ -439,30 +431,30 @@ class _SupplierCards extends StatelessWidget {
               itemBuilder: (context) {
                 final auth = context.watch<AuthNotifier>();
                 return [
-                if (!s.isDeleted) ...[
-                  const PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                  const PopupMenuItem(
-                    value: 'soft',
-                    child: Text('Удалить логически'),
-                  ),
-                  if (auth.canHardDelete)
+                  if (!s.isDeleted) ...[
+                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
                     const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
+                      value: 'soft',
+                      child: Text('Удалить логически'),
                     ),
-                ] else ...[
-                  if (auth.canRestore)
-                    const PopupMenuItem(
-                      value: 'restore',
-                      child: Text('Восстановить'),
-                    ),
-                  if (auth.canHardDelete)
-                    const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
-                    ),
-                ],
-              ];
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ] else ...[
+                    if (auth.canRestore)
+                      const PopupMenuItem(
+                        value: 'restore',
+                        child: Text('Восстановить'),
+                      ),
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ],
+                ];
               },
             ),
           ),

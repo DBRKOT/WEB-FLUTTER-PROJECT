@@ -11,21 +11,21 @@ import 'supplier_repository.dart';
 
 class PersistentSupplierRepository implements SupplierRepository {
   PersistentSupplierRepository(SharedPreferences prefs, this._products)
-      : _store = PrefsListStore<Supplier>(
-          prefs: prefs,
-          key: 'suppliers_v1',
-          seed: seedSuppliers,
-          fromJson: Supplier.fromJson,
-          toJson: (s) => s.toJson(),
-          idOf: (s) => s.id,
-          withId: (s, id) => Supplier(
-            id: id,
-            name: s.name,
-            country: s.country,
-            phone: s.phone,
-            deletedAt: s.deletedAt,
-          ),
-        );
+    : _store = PrefsListStore<Supplier>(
+        prefs: prefs,
+        key: 'suppliers_v1',
+        seed: seedSuppliers,
+        fromJson: Supplier.fromJson,
+        toJson: (s) => s.toJson(),
+        idOf: (s) => s.id,
+        withId: (s, id) => Supplier(
+          id: id,
+          name: s.name,
+          country: s.country,
+          phone: s.phone,
+          deletedAt: s.deletedAt,
+        ),
+      );
 
   final ProductRepository _products;
   final PrefsListStore<Supplier> _store;
@@ -49,9 +49,7 @@ class PersistentSupplierRepository implements SupplierRepository {
 
   @override
   Future<List<Supplier>> findAll({bool includeDeleted = false}) async {
-    return _store.items
-        .where((s) => includeDeleted || !s.isDeleted)
-        .toList()
+    return _store.items.where((s) => includeDeleted || !s.isDeleted).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
@@ -67,10 +65,9 @@ class PersistentSupplierRepository implements SupplierRepository {
   Future<void> _ensureNoProducts(int id) async {
     final count = await _products.countBySupplier(id);
     if (count > 0) {
-      throw FieldValidationException(
-        {'supplier': 'Нельзя удалить: есть $count связанн(ых) товар(ов)'},
-        'Нельзя удалить поставщика: есть $count связанн(ых) товар(ов)',
-      );
+      throw FieldValidationException({
+        'supplier': 'Нельзя удалить: есть $count связанн(ых) товар(ов)',
+      }, 'Нельзя удалить поставщика: есть $count связанн(ых) товар(ов)');
     }
   }
 

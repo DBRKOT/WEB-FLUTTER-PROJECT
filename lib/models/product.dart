@@ -5,8 +5,8 @@ class Product {
   final int year;
   final int price;
   final int supplierId; // многие к одному
-  final List<int> brandIds;// многие ко многим
-  final List<int> categoryIds;// многие ко многим
+  final List<int> brandIds; // многие ко многим
+  final List<int> categoryIds; // многие ко многим
   final int stockTotal;
   final int stockAvailable;
   final DateTime? deletedAt;
@@ -58,18 +58,18 @@ class Product {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'sku': sku,
-        'year': year,
-        'price': price,
-        'supplierId': supplierId,
-        'brandIds': brandIds,
-        'categoryIds': categoryIds,
-        'stockTotal': stockTotal,
-        'stockAvailable': stockAvailable,
-        'deletedAt': deletedAt?.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'sku': sku,
+    'year': year,
+    'price': price,
+    'supplierId': supplierId,
+    'brandIds': brandIds,
+    'categoryIds': categoryIds,
+    'stockTotal': stockTotal,
+    'stockAvailable': stockAvailable,
+    'deletedAt': deletedAt?.toIso8601String(),
+  };
 
   factory Product.fromJson(Map<String, dynamic> json) {
     final brandIds = <int>[
@@ -86,7 +86,8 @@ class Product {
     ];
 
     final publisher = json['publisher'];
-    final supplierId = json['supplierId'] as int? ??
+    final supplierId =
+        json['supplierId'] as int? ??
         json['publisherId'] as int? ??
         (publisher is Map ? publisher['id'] as int? : null) ??
         1;
@@ -100,9 +101,12 @@ class Product {
       supplierId: supplierId,
       brandIds: brandIds.toSet().toList(),
       categoryIds: categoryIds.toSet().toList(),
-      stockTotal: json['stockTotal'] as int? ?? json['copiesTotal'] as int? ?? 0,
+      stockTotal:
+          json['stockTotal'] as int? ?? json['copiesTotal'] as int? ?? 0,
       stockAvailable:
-          json['stockAvailable'] as int? ?? json['copiesAvailable'] as int? ?? 0,
+          json['stockAvailable'] as int? ??
+          json['copiesAvailable'] as int? ??
+          0,
       deletedAt: json['deletedAt'] == null
           ? null
           : DateTime.tryParse(json['deletedAt'] as String),

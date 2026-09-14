@@ -9,20 +9,20 @@ import 'seed_data.dart';
 
 class PersistentCategoryRepository implements CategoryRepository {
   PersistentCategoryRepository(SharedPreferences prefs)
-      : _store = PrefsListStore<Category>(
-          prefs: prefs,
-          key: 'categories_v1',
-          seed: seedCategories,
-          fromJson: Category.fromJson,
-          toJson: (c) => c.toJson(),
-          idOf: (c) => c.id,
-          withId: (c, id) => Category(
-            id: id,
-            name: c.name,
-            description: c.description,
-            deletedAt: c.deletedAt,
-          ),
-        );
+    : _store = PrefsListStore<Category>(
+        prefs: prefs,
+        key: 'categories_v1',
+        seed: seedCategories,
+        fromJson: Category.fromJson,
+        toJson: (c) => c.toJson(),
+        idOf: (c) => c.id,
+        withId: (c, id) => Category(
+          id: id,
+          name: c.name,
+          description: c.description,
+          deletedAt: c.deletedAt,
+        ),
+      );
 
   final PrefsListStore<Category> _store;
 
@@ -36,8 +36,9 @@ class PersistentCategoryRepository implements CategoryRepository {
           c.name.toLowerCase().contains(needle) ||
           c.description.toLowerCase().contains(needle),
       compare: (a, b) => switch (q.sortField) {
-        'description' =>
-          a.description.toLowerCase().compareTo(b.description.toLowerCase()),
+        'description' => a.description.toLowerCase().compareTo(
+          b.description.toLowerCase(),
+        ),
         _ => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
       },
     );
@@ -45,9 +46,7 @@ class PersistentCategoryRepository implements CategoryRepository {
 
   @override
   Future<List<Category>> findAll({bool includeDeleted = false}) async {
-    return _store.items
-        .where((c) => includeDeleted || !c.isDeleted)
-        .toList()
+    return _store.items.where((c) => includeDeleted || !c.isDeleted).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 

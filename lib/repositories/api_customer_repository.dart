@@ -73,20 +73,20 @@ class ApiCustomerRepository implements CustomerRepository {
 
   @override
   Future<bool> isEmailTaken(String email, {int? excludeId}) => guard(() async {
-        final page = await _api.findPage(search: email.trim(), size: 50);
-        for (final row in page.items) {
-          final customer = Customer.fromJson(row);
-          if (customer.email.toLowerCase() == email.trim().toLowerCase() &&
-              customer.id != excludeId) {
-            return true;
-          }
-        }
-        return false;
-      });
+    final page = await _api.findPage(search: email.trim(), size: 50);
+    for (final row in page.items) {
+      final customer = Customer.fromJson(row);
+      if (customer.email.toLowerCase() == email.trim().toLowerCase() &&
+          customer.id != excludeId) {
+        return true;
+      }
+    }
+    return false;
+  });
 
   Map<String, dynamic> _toReaderBody(Customer customer) => {
-        'fullName': customer.fullName,
-        'email': customer.email,
-        'phone': customer.phone,
-      };
+    'fullName': customer.fullName,
+    'email': customer.email,
+    'phone': customer.phone,
+  };
 }

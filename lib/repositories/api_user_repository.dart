@@ -13,11 +13,7 @@ class ApiUserRepository {
       guard(() async {
         final response = await _dio.get(
           '/users',
-          queryParameters: {
-            'page': page,
-            'size': size,
-            'sort': 'id,asc',
-          },
+          queryParameters: {'page': page, 'size': size, 'sort': 'id,asc'},
         );
         final data = response.data as Map<String, dynamic>;
         return PageResult(

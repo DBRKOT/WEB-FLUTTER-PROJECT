@@ -35,9 +35,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       _error = null;
     });
     try {
-      final category = await context
-          .read<CategoryListNotifier>()
-          .findById(widget.categoryId);
+      final category = await context.read<CategoryListNotifier>().findById(
+        widget.categoryId,
+      );
       if (!mounted) return;
       setState(() {
         _category = category;
@@ -58,6 +58,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       appBar: AppBar(
         title: Text(_category?.name ?? 'Категория'),
         leading: IconButton(
+          tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {

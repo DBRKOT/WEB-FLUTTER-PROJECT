@@ -59,8 +59,9 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
       _loadError = null;
     });
     try {
-      final existing =
-          await context.read<CategoryListNotifier>().findById(widget.id!);
+      final existing = await context.read<CategoryListNotifier>().findById(
+        widget.id!,
+      );
       if (existing == null) throw StateError('Категория не найдена');
       _nameController.text = existing.name;
       _descriptionController.text = existing.description;
@@ -100,15 +101,12 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
       context.pop();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      final msg = e.errors.values.isEmpty
-          ? e.message
-          : e.errors.values.first;
+      final msg = e.errors.values.isEmpty ? e.message : e.errors.values.first;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

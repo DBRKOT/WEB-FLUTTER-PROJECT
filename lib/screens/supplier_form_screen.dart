@@ -61,8 +61,9 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
       _loadError = null;
     });
     try {
-      final existing =
-          await context.read<SupplierListNotifier>().findById(widget.id!);
+      final existing = await context.read<SupplierListNotifier>().findById(
+        widget.id!,
+      );
       if (existing == null) throw StateError('Поставщик не найден');
       _nameController.text = existing.name;
       _countryController.text = existing.country;
@@ -104,15 +105,12 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
       context.pop();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      final msg = e.errors.values.isEmpty
-          ? e.message
-          : e.errors.values.first;
+      final msg = e.errors.values.isEmpty ? e.message : e.errors.values.first;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -5,14 +5,16 @@ import '../repositories/brand_repository.dart';
 import '../repositories/category_repository.dart';
 import '../repositories/supplier_repository.dart';
 
+// ignore_for_file: prefer_initializing_formals
+
 class ReferenceCache {
   ReferenceCache({
     required BrandRepository brands,
     required CategoryRepository categories,
     required SupplierRepository suppliers,
-  })  : _brands = brands,
-        _categories = categories,
-        _suppliers = suppliers;
+  }) : _brands = brands,
+       _categories = categories,
+       _suppliers = suppliers;
 
   final BrandRepository _brands;
   final CategoryRepository _categories;

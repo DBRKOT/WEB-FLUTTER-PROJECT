@@ -73,8 +73,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       setState(() {
         _product = product;
         _brands = brands.where((b) => product.brandIds.contains(b.id)).toList();
-        _categories =
-            categories.where((c) => product.categoryIds.contains(c.id)).toList();
+        _categories = categories
+            .where((c) => product.categoryIds.contains(c.id))
+            .toList();
         _supplier = supplier;
         _status = LoadStatus.success;
       });
@@ -105,25 +106,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Экземпляры ещё есть — попробуйте товар с малым остатком'),
+          content: Text(
+            'Экземпляры ещё есть — попробуйте товар с малым остатком',
+          ),
         ),
       );
     } on ConflictException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('409: ${e.message}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('409: ${e.message}')));
       await _load();
     } on ForbiddenException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('403: ${e.message}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('403: ${e.message}')));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _loanBusy = false);
     }
@@ -136,6 +136,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       appBar: AppBar(
         title: Text(_product?.name ?? 'Карточка товара'),
         leading: IconButton(
+          tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {
@@ -146,9 +147,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           },
         ),
         actions: [
-          if (_product != null &&
-              !_product!.isDeleted &&
-              auth.canEditCatalog)
+          if (_product != null && !_product!.isDeleted && auth.canEditCatalog)
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
@@ -256,10 +255,7 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _row(String label, String value) {
-    return ListTile(
-      title: Text(label),
-      subtitle: Text(value),
-    );
+    return ListTile(title: Text(label), subtitle: Text(value));
   }
 }
 

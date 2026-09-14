@@ -9,7 +9,7 @@ import 'supplier_repository.dart';
 
 class ApiSupplierRepository implements SupplierRepository {
   ApiSupplierRepository(Dio dio, this._products)
-      : _api = ApiCollectionClient(dio, 'publishers');
+    : _api = ApiCollectionClient(dio, 'publishers');
 
   final ApiCollectionClient _api;
   final ProductRepository _products;
@@ -77,8 +77,8 @@ class ApiSupplierRepository implements SupplierRepository {
       _products.countBySupplier(supplierId);
 
   Map<String, dynamic> _toPublisherBody(Supplier supplier) => {
-        'name': supplier.name,
-        'city': supplier.country,
-        'foundedYear': 1990,
-      };
+    'name': supplier.name,
+    'city': supplier.country,
+    'foundedYear': 1990,
+  };
 }

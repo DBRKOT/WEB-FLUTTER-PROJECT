@@ -10,22 +10,25 @@ import '../screens/category_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
 import '../screens/customer_list_screen.dart';
-import '../screens/forbidden_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_orders_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/product_detail_screen.dart';
 import '../screens/product_form_screen.dart';
 import '../screens/product_list_screen.dart';
-import '../screens/register_screen.dart';
-import '../screens/stats_screen.dart';
 import '../screens/supplier_detail_screen.dart';
 import '../screens/supplier_form_screen.dart';
 import '../screens/supplier_list_screen.dart';
-import '../screens/users_screen.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/deferred_screen.dart';
 import 'auth_notifier.dart';
 import 'permissions.dart';
+
+
+import '../screens/forbidden_screen.dart' deferred as forbidden_lib;
+import '../screens/register_screen.dart' deferred as register_lib;
+import '../screens/stats_screen.dart' deferred as stats_lib;
+import '../screens/users_screen.dart' deferred as users_lib;
 
 GoRouter createAppRouter(AuthNotifier auth) {
   return GoRouter(
@@ -55,17 +58,22 @@ GoRouter createAppRouter(AuthNotifier auth) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => LoginScreen(
-          from: state.uri.queryParameters['from'],
-        ),
+        builder: (context, state) =>
+            LoginScreen(from: state.uri.queryParameters['from']),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) => DeferredScreen(
+          loadLibrary: register_lib.loadLibrary,
+          builder: () => register_lib.RegisterScreen(),
+        ),
       ),
       GoRoute(
         path: '/forbidden',
-        builder: (context, state) => const ForbiddenScreen(),
+        builder: (context, state) => DeferredScreen(
+          loadLibrary: forbidden_lib.loadLibrary,
+          builder: () => forbidden_lib.ForbiddenScreen(),
+        ),
       ),
       GoRoute(path: '/', redirect: (_, _) => '/products'),
       ShellRoute(
@@ -118,11 +126,17 @@ GoRouter createAppRouter(AuthNotifier auth) {
           ),
           GoRoute(
             path: '/admin/users',
-            builder: (context, state) => const UsersScreen(),
+            builder: (context, state) => DeferredScreen(
+              loadLibrary: users_lib.loadLibrary,
+              builder: () => users_lib.UsersScreen(),
+            ),
           ),
           GoRoute(
             path: '/admin/stats',
-            builder: (context, state) => const StatsScreen(),
+            builder: (context, state) => DeferredScreen(
+              loadLibrary: stats_lib.loadLibrary,
+              builder: () => stats_lib.StatsScreen(),
+            ),
           ),
         ],
       ),

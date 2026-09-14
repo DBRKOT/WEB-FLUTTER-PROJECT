@@ -61,9 +61,9 @@ class PersistentProductRepository implements ProductRepository {
           (excludeId == null || p.id != excludeId),
     );
     if (taken) {
-      throw FieldValidationException(
-        {'sku': 'Товар с таким артикулом уже существует'},
-      );
+      throw FieldValidationException({
+        'sku': 'Товар с таким артикулом уже существует',
+      });
     }
   }
 
@@ -78,7 +78,9 @@ class PersistentProductRepository implements ProductRepository {
 
   @override
   Future<int> countBySupplier(int supplierId) async {
-    return _products.where((p) => p.supplierId == supplierId && !p.isDeleted).length;
+    return _products
+        .where((p) => p.supplierId == supplierId && !p.isDeleted)
+        .length;
   }
 
   @override
@@ -87,7 +89,9 @@ class PersistentProductRepository implements ProductRepository {
     CancelToken? cancelToken,
   }) async {
     await Future.delayed(const Duration(milliseconds: 250));
-    var rows = _products.where((p) => q.includeDeleted || !p.isDeleted).toList();
+    var rows = _products
+        .where((p) => q.includeDeleted || !p.isDeleted)
+        .toList();
     if (q.search.trim().isNotEmpty) {
       final needle = q.search.trim().toLowerCase();
       rows = rows

@@ -8,11 +8,7 @@ import '../core/permissions.dart';
 import '../models/app_user.dart';
 
 class AppScaffold extends StatelessWidget {
-  const AppScaffold({
-    super.key,
-    required this.child,
-    required this.location,
-  });
+  const AppScaffold({super.key, required this.child, required this.location});
 
   final Widget child;
   final String location;
@@ -26,30 +22,40 @@ class AppScaffold extends StatelessWidget {
     if (auth.canEditCatalog) {
       items.addAll([
         (path: '/brands', icon: Icons.factory_outlined, label: 'Бренды'),
-        (path: '/categories', icon: Icons.category_outlined, label: 'Категории'),
+        (
+          path: '/categories',
+          icon: Icons.category_outlined,
+          label: 'Категории',
+        ),
         (
           path: '/suppliers',
           icon: Icons.local_shipping_outlined,
-          label: 'Поставщики'
+          label: 'Поставщики',
         ),
         (path: '/customers', icon: Icons.people_outline, label: 'Клиенты'),
         (path: '/orders', icon: Icons.assignment_outlined, label: 'Заказы'),
       ]);
     }
     if (auth.canViewMyOrders) {
-      items.add(
-        (path: '/my-orders', icon: Icons.shopping_bag_outlined, label: 'Мои заказы'),
-      );
+      items.add((
+        path: '/my-orders',
+        icon: Icons.shopping_bag_outlined,
+        label: 'Мои заказы',
+      ));
     }
     if (auth.canManageUsers) {
-      items.add(
-        (path: '/admin/users', icon: Icons.manage_accounts_outlined, label: 'Пользователи'),
-      );
+      items.add((
+        path: '/admin/users',
+        icon: Icons.manage_accounts_outlined,
+        label: 'Пользователи',
+      ));
     }
     if (auth.canViewStats) {
-      items.add(
-        (path: '/admin/stats', icon: Icons.bar_chart_outlined, label: 'Статистика'),
-      );
+      items.add((
+        path: '/admin/stats',
+        icon: Icons.bar_chart_outlined,
+        label: 'Статистика',
+      ));
     }
     return items;
   }
@@ -136,10 +142,7 @@ class AppScaffold extends StatelessWidget {
                 value: 'reload',
                 child: Text('Перечитать localStorage'),
               ),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Text('Выйти'),
-              ),
+              const PopupMenuItem(value: 'logout', child: Text('Выйти')),
             ],
           ),
         ),
@@ -152,7 +155,8 @@ class AppScaffold extends StatelessWidget {
     final auth = context.watch<AuthNotifier>();
     final destinations = _destinationsFor(auth);
     final size = screenSizeOf(context);
-    final index = _selectedIndex(destinations).clamp(0, destinations.length - 1);
+    final index = _selectedIndex(destinations)
+        .clamp(0, destinations.length - 1);
 
     if (size == ScreenSize.compact) {
       return Scaffold(
@@ -183,10 +187,7 @@ class AppScaffold extends StatelessWidget {
                     value: 'reload',
                     child: Text('Перечитать localStorage'),
                   ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Text('Выйти'),
-                  ),
+                  const PopupMenuItem(value: 'logout', child: Text('Выйти')),
                 ];
               },
             ),
@@ -195,6 +196,9 @@ class AppScaffold extends StatelessWidget {
         body: child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
+          labelBehavior: destinations.length > 3
+              ? NavigationDestinationLabelBehavior.onlyShowSelected
+              : NavigationDestinationLabelBehavior.alwaysShow,
           onDestinationSelected: (i) =>
               _onSelect(context, destinations[i].path),
           destinations: [

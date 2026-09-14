@@ -43,11 +43,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _submitting = true);
     try {
       await context.read<AuthNotifier>().register(
-            username: _usernameController.text,
-            password: _passwordController.text,
-            fullName: _fullNameController.text,
-            email: _emailController.text,
-          );
+        username: _usernameController.text,
+        password: _passwordController.text,
+        fullName: _fullNameController.text,
+        email: _emailController.text,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Аккаунт создан. Войдите в систему.')),
@@ -155,8 +155,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         border: const OutlineInputBorder(),
                         helperText: '≥8 символов, цифра и спецсимвол (!@#)',
                         suffixIcon: IconButton(
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          tooltip: _obscure
+                              ? 'Показать пароль'
+                              : 'Скрыть пароль',
+                          onPressed: () => setState(() => _obscure = !_obscure),
                           icon: Icon(
                             _obscure
                                 ? Icons.visibility_outlined
@@ -167,10 +169,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       validator: (value) {
                         final api = _fieldErrors['password'];
                         if (api != null) return api;
-                        return V.combine([
-                          V.required(),
-                          V.strongPassword(),
-                        ])(value);
+                        return V.combine([V.required(), V.strongPassword()])(
+                          value,
+                        );
                       },
                     ),
                     if (_error != null) ...[
@@ -195,8 +196,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed:
-                          _submitting ? null : () => context.go('/login'),
+                      onPressed: _submitting
+                          ? null
+                          : () => context.go('/login'),
                       child: const Text('Уже есть аккаунт'),
                     ),
                   ],

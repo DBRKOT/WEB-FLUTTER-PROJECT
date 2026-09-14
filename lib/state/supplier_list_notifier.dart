@@ -6,9 +6,11 @@ import '../models/supplier.dart';
 import '../repositories/supplier_repository.dart';
 import 'entity_list_notifier.dart';
 
+// ignore_for_file: prefer_initializing_formals
+
 class SupplierListNotifier extends EntityListNotifier<Supplier> {
   SupplierListNotifier(this._repository, {ReferenceCache? cache})
-      : _cache = cache;
+    : _cache = cache;
 
   final SupplierRepository _repository;
   final ReferenceCache? _cache;

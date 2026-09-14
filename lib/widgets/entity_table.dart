@@ -71,9 +71,7 @@ class EntityTable<T> extends StatelessWidget {
                   selected: selected.contains(idOf(item)),
                   color: (isDeleted?.call(item) ?? false)
                       ? WidgetStatePropertyAll(
-                          Theme.of(context)
-                              .colorScheme
-                              .errorContainer
+                          Theme.of(context).colorScheme.errorContainer
                               .withValues(alpha: 0.35),
                         )
                       : null,

@@ -1,10 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageMigrationResult {
-  const StorageMigrationResult({
-    required this.didMigrate,
-    this.message,
-  });
+  const StorageMigrationResult({required this.didMigrate, this.message});
 
   final bool didMigrate;
   final String? message;

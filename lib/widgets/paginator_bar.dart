@@ -35,7 +35,9 @@ class PaginatorBar extends StatelessWidget {
             const SizedBox(width: 8),
             const Text('На странице:'),
             DropdownButton<int>(
-              value: availableSizes.contains(size) ? size : availableSizes.first,
+              value: availableSizes.contains(size)
+                  ? size
+                  : availableSizes.first,
               items: [
                 for (final s in availableSizes)
                   DropdownMenuItem(value: s, child: Text('$s')),
@@ -57,13 +59,16 @@ class PaginatorBar extends StatelessWidget {
             Text('Стр. $page из $totalPages'),
             IconButton(
               tooltip: 'Следующая',
-              onPressed: page < totalPages ? () => onPageChanged(page + 1) : null,
+              onPressed: page < totalPages
+                  ? () => onPageChanged(page + 1)
+                  : null,
               icon: const Icon(Icons.chevron_right),
             ),
             IconButton(
               tooltip: 'Последняя',
-              onPressed:
-                  page < totalPages ? () => onPageChanged(totalPages) : null,
+              onPressed: page < totalPages
+                  ? () => onPageChanged(totalPages)
+                  : null,
               icon: const Icon(Icons.last_page),
             ),
           ],

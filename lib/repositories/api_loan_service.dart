@@ -9,10 +9,7 @@ class ApiLoanService {
 
   final Dio _dio;
 
-  Future<PageResult<LoanOrder>> findOrders({
-    int page = 1,
-    int size = 20,
-  }) =>
+  Future<PageResult<LoanOrder>> findOrders({int page = 1, int size = 20}) =>
       guard(() async {
         final response = await _dio.get(
           '/loans',
@@ -34,28 +31,20 @@ class ApiLoanService {
     required int readerId,
     required int bookId,
     int days = 14,
-  }) =>
-      guard(() async {
-        await _dio.post(
-          '/loans',
-          data: {
-            'readerId': readerId,
-            'bookId': bookId,
-            'days': days,
-          },
-        );
-      });
+  }) => guard(() async {
+    await _dio.post(
+      '/loans',
+      data: {'readerId': readerId, 'bookId': bookId, 'days': days},
+    );
+  });
 
   Future<LoanOrder> returnLoan(int id) => guard(() async {
-        final response = await _dio.post('/loans/$id/return');
-        return LoanOrder.fromJson(response.data as Map<String, dynamic>);
-      });
+    final response = await _dio.post('/loans/$id/return');
+    return LoanOrder.fromJson(response.data as Map<String, dynamic>);
+  });
 
   Future<LoanOrder> extendLoan(int id, {int days = 14}) => guard(() async {
-        final response = await _dio.post(
-          '/loans/$id/extend',
-          data: {'days': days},
-        );
-        return LoanOrder.fromJson(response.data as Map<String, dynamic>);
-      });
+    final response = await _dio.post('/loans/$id/extend', data: {'days': days});
+    return LoanOrder.fromJson(response.data as Map<String, dynamic>);
+  });
 }

@@ -1,0 +1,12 @@
+
+services:
+  - type: web
+    name: technomarket-mock-api
+    runtime: node
+    rootDir: api
+    plan: free
+    buildCommand: "echo no-build"
+    startCommand: "node mock-server.js --origin *"
+    envVars:
+      - key: PORT
+        value: "10000"

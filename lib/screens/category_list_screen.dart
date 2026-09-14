@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../core/auth_notifier.dart';
 import '../core/permissions.dart';
 
@@ -14,6 +15,7 @@ import '../state/load_status.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
+import '../widgets/table_cell_text.dart';
 
 class CategoryListScreen extends StatefulWidget {
   const CategoryListScreen({super.key});
@@ -110,9 +112,9 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       ),
       floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
           ? FloatingActionButton(
-        tooltip: 'Новая категория',
-        onPressed: () => context.push('/categories/new'),
-        child: const Icon(Icons.add),
+              tooltip: 'Новая категория',
+              onPressed: () => context.push('/categories/new'),
+              child: const Icon(Icons.add),
             )
           : null,
       body: Column(
@@ -180,16 +182,12 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                         TableColumnSpec(
                           label: 'Название',
                           sortField: 'name',
-                          build: (c) => Text(c.name),
+                          build: (c) => tableCellText(c.name),
                         ),
                         TableColumnSpec(
                           label: 'Описание',
                           sortField: 'description',
-                          build: (c) => Text(
-                            c.description,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          build: (c) => tableCellText(c.description),
                         ),
                       ],
                       actions: (c) => _actions(context, c),
@@ -204,8 +202,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
               total: notifier.result.total,
               size: q.size,
               onPageChanged: (page) => _apply(q.copyWith(page: page)),
-              onSizeChanged: (size) =>
-                  _apply(q.copyWith(size: size, page: 1)),
+              onSizeChanged: (size) => _apply(q.copyWith(size: size, page: 1)),
             ),
         ],
       ),
@@ -354,10 +351,8 @@ class _CategoryCards extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 6),
           color: c.isDeleted
-              ? Theme.of(context)
-                  .colorScheme
-                  .errorContainer
-                  .withValues(alpha: 0.35)
+              ? Theme.of(context).colorScheme.errorContainer
+                    .withValues(alpha: 0.35)
               : null,
           child: ListTile(
             dense: true,
@@ -384,30 +379,30 @@ class _CategoryCards extends StatelessWidget {
               itemBuilder: (context) {
                 final auth = context.watch<AuthNotifier>();
                 return [
-                if (!c.isDeleted) ...[
-                  const PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                  const PopupMenuItem(
-                    value: 'soft',
-                    child: Text('Удалить логически'),
-                  ),
-                  if (auth.canHardDelete)
+                  if (!c.isDeleted) ...[
+                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
                     const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
+                      value: 'soft',
+                      child: Text('Удалить логически'),
                     ),
-                ] else ...[
-                  if (auth.canRestore)
-                    const PopupMenuItem(
-                      value: 'restore',
-                      child: Text('Восстановить'),
-                    ),
-                  if (auth.canHardDelete)
-                    const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
-                    ),
-                ],
-              ];
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ] else ...[
+                    if (auth.canRestore)
+                      const PopupMenuItem(
+                        value: 'restore',
+                        child: Text('Восстановить'),
+                      ),
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ],
+                ];
               },
             ),
           ),

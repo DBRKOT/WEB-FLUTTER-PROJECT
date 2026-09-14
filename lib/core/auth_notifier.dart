@@ -34,8 +34,7 @@ class AuthNotifier extends ChangeNotifier {
   DateTime? get sessionStartedAt => _sessionStartedAt;
   DateTime get lastActivityAt => _lastActivityAt;
 
-  bool has(UserRole role) =>
-      _user != null && _user!.role.level >= role.level;
+  bool has(UserRole role) => _user != null && _user!.role.level >= role.level;
 
   void seedForTest(AppUser user, {String accessToken = 'test-token'}) {
     _user = user;
@@ -108,8 +107,7 @@ class AuthNotifier extends ChangeNotifier {
         } else {
           await logout();
         }
-      } catch (_) {
-      }
+      } catch (_) {}
     } finally {
       _restoring = false;
       notifyListeners();
@@ -123,10 +121,7 @@ class AuthNotifier extends ChangeNotifier {
     await guard(() async {
       final response = await _dio.post(
         '/auth/login',
-        data: {
-          'username': username.trim(),
-          'password': password,
-        },
+        data: {'username': username.trim(), 'password': password},
       );
       final data = response.data as Map<String, dynamic>;
       await _applyAuthPayload(data, startNewSession: true);
@@ -170,14 +165,14 @@ class AuthNotifier extends ChangeNotifier {
     if (refresh != null && refresh.isNotEmpty) {
       try {
         await _dio.post('/auth/logout', data: {'refreshToken': refresh});
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     _loggingOut = false;
     if (reason != null && kDebugMode) {
       debugPrint('[Auth] logout: $reason');
     }
   }
+
   Future<void> refreshOrLogin(Dio dio) => refreshTokens(client: dio);
 
   Future<void> refreshTokens({Dio? client}) async {

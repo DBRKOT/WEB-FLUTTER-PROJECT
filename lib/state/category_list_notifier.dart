@@ -5,9 +5,11 @@ import '../models/simple_query.dart';
 import '../repositories/category_repository.dart';
 import 'entity_list_notifier.dart';
 
+// ignore_for_file: prefer_initializing_formals
+
 class CategoryListNotifier extends EntityListNotifier<Category> {
   CategoryListNotifier(this._repository, {ReferenceCache? cache})
-      : _cache = cache;
+    : _cache = cache;
 
   final CategoryRepository _repository;
   final ReferenceCache? _cache;

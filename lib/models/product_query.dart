@@ -29,7 +29,9 @@ class ProductQuery {
     final q = uri.queryParameters;
     final sortRaw = q['sort'] ?? 'name,asc';
     final parts = sortRaw.split(',');
-    final field = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first : 'name';
+    final field = parts.isNotEmpty && parts.first.isNotEmpty
+        ? parts.first
+        : 'name';
     final ascending = parts.length < 2 || parts[1].toLowerCase() != 'desc';
     return ProductQuery(
       search: q['search'] ?? '',
@@ -113,18 +115,18 @@ class ProductQuery {
 
   @override
   int get hashCode => Object.hash(
-        search,
-        categoryId,
-        brandId,
-        supplierId,
-        yearFrom,
-        yearTo,
-        sortField,
-        sortAscending,
-        page,
-        size,
-        includeDeleted,
-      );
+    search,
+    categoryId,
+    brandId,
+    supplierId,
+    yearFrom,
+    yearTo,
+    sortField,
+    sortAscending,
+    page,
+    size,
+    includeDeleted,
+  );
 
   static const _unset = Object();
 }

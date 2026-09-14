@@ -25,7 +25,9 @@ class BrandQuery {
     final q = uri.queryParameters;
     final sortRaw = q['sort'] ?? 'name,asc';
     final parts = sortRaw.split(',');
-    final field = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first : 'name';
+    final field = parts.isNotEmpty && parts.first.isNotEmpty
+        ? parts.first
+        : 'name';
     final ascending = parts.length < 2 || parts[1].toLowerCase() != 'desc';
     return BrandQuery(
       search: q['search'] ?? '',
@@ -73,8 +75,9 @@ class BrandQuery {
     return BrandQuery(
       search: search ?? this.search,
       country: country == _unset ? this.country : country as String?,
-      foundedFrom:
-          foundedFrom == _unset ? this.foundedFrom : foundedFrom as int?,
+      foundedFrom: foundedFrom == _unset
+          ? this.foundedFrom
+          : foundedFrom as int?,
       foundedTo: foundedTo == _unset ? this.foundedTo : foundedTo as int?,
       sortField: sortField ?? this.sortField,
       sortAscending: sortAscending ?? this.sortAscending,
@@ -100,16 +103,16 @@ class BrandQuery {
 
   @override
   int get hashCode => Object.hash(
-        search,
-        country,
-        foundedFrom,
-        foundedTo,
-        sortField,
-        sortAscending,
-        page,
-        size,
-        includeDeleted,
-      );
+    search,
+    country,
+    foundedFrom,
+    foundedTo,
+    sortField,
+    sortAscending,
+    page,
+    size,
+    includeDeleted,
+  );
 
   static const _unset = Object();
 }

@@ -8,6 +8,8 @@ import '../models/page_result.dart';
 import '../repositories/brand_repository.dart';
 import 'load_status.dart';
 
+// ignore_for_file: prefer_initializing_formals
+
 class BrandListNotifier extends ChangeNotifier {
   BrandListNotifier(this._repository, {ReferenceCache? cache}) : _cache = cache;
 

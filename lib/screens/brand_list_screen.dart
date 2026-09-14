@@ -16,6 +16,7 @@ import '../state/load_status.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
+import '../widgets/table_cell_text.dart';
 
 class BrandListScreen extends StatefulWidget {
   const BrandListScreen({super.key});
@@ -91,10 +92,7 @@ class _BrandListScreenState extends State<BrandListScreen> {
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<BrandListNotifier>();
-    final countries = {
-      for (final b in seedBrands) b.country,
-    }.toList()
-      ..sort();
+    final countries = {for (final b in seedBrands) b.country}.toList()..sort();
 
     return Scaffold(
       appBar: AppBar(
@@ -103,7 +101,9 @@ class _BrandListScreenState extends State<BrandListScreen> {
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Center(child: Text('Выбрано: ${notifier.selected.length}')),
+              child: Center(
+                child: Text('Выбрано: ${notifier.selected.length}'),
+              ),
             ),
           if (notifier.hasSelection)
             IconButton(
@@ -120,9 +120,9 @@ class _BrandListScreenState extends State<BrandListScreen> {
       ),
       floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
           ? FloatingActionButton(
-        tooltip: 'Новый бренд',
-        onPressed: () => context.push('/brands/new'),
-        child: const Icon(Icons.add),
+              tooltip: 'Новый бренд',
+              onPressed: () => context.push('/brands/new'),
+              child: const Icon(Icons.add),
             )
           : null,
       body: Column(
@@ -167,12 +167,12 @@ class _BrandListScreenState extends State<BrandListScreen> {
                         TableColumnSpec(
                           label: 'Название',
                           sortField: 'name',
-                          build: (b) => Text(b.name),
+                          build: (b) => tableCellText(b.name),
                         ),
                         TableColumnSpec(
                           label: 'Страна',
                           sortField: 'country',
-                          build: (b) => Text(b.country),
+                          build: (b) => tableCellText(b.country),
                         ),
                         TableColumnSpec(
                           label: 'Год основания',
@@ -183,7 +183,7 @@ class _BrandListScreenState extends State<BrandListScreen> {
                         TableColumnSpec(
                           label: 'Email',
                           sortField: 'email',
-                          build: (b) => Text(b.email),
+                          build: (b) => tableCellText(b.email),
                         ),
                       ],
                       actions: (b) => _brandActions(context, b),
@@ -305,7 +305,9 @@ class _BrandListScreenState extends State<BrandListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Удалить выбранные'),
-        content: Text('Логически удалить ${notifier.selected.length} бренд(ов)?'),
+        content: Text(
+          'Логически удалить ${notifier.selected.length} бренд(ов)?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -426,8 +428,7 @@ class _BrandFilters extends StatelessWidget {
           FilterChip(
             label: const Text('Показать удалённые'),
             selected: q.includeDeleted,
-            onSelected: (value) =>
-                onApply(q.copyWith(includeDeleted: value)),
+            onSelected: (value) => onApply(q.copyWith(includeDeleted: value)),
           ),
         ],
       ),
@@ -451,10 +452,8 @@ class _BrandCards extends StatelessWidget {
         final b = items[index];
         return Card(
           color: b.isDeleted
-              ? Theme.of(context)
-                  .colorScheme
-                  .errorContainer
-                  .withValues(alpha: 0.35)
+              ? Theme.of(context).colorScheme.errorContainer
+                    .withValues(alpha: 0.35)
               : null,
           child: ListTile(
             leading: Checkbox(
@@ -462,7 +461,9 @@ class _BrandCards extends StatelessWidget {
               onChanged: (_) => notifier.toggleSelection(b.id),
             ),
             title: Text(b.name),
-            subtitle: Text('${b.country} · с ${b.foundedYear} года · ${b.email}'),
+            subtitle: Text(
+              '${b.country} · с ${b.foundedYear} года · ${b.email}',
+            ),
             onTap: () => context.push('/brands/${b.id}'),
             trailing: PopupMenuButton<String>(
               onSelected: (value) async {
@@ -480,33 +481,30 @@ class _BrandCards extends StatelessWidget {
               itemBuilder: (context) {
                 final auth = context.watch<AuthNotifier>();
                 return [
-                if (!b.isDeleted) ...[
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Изменить'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'soft',
-                    child: Text('Удалить логически'),
-                  ),
-                  if (auth.canHardDelete)
+                  if (!b.isDeleted) ...[
+                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
                     const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
+                      value: 'soft',
+                      child: Text('Удалить логически'),
                     ),
-                ] else ...[
-                  if (auth.canRestore)
-                    const PopupMenuItem(
-                      value: 'restore',
-                      child: Text('Восстановить'),
-                    ),
-                  if (auth.canHardDelete)
-                    const PopupMenuItem(
-                      value: 'hard',
-                      child: Text('Удалить навсегда'),
-                    ),
-                ],
-              ];
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ] else ...[
+                    if (auth.canRestore)
+                      const PopupMenuItem(
+                        value: 'restore',
+                        child: Text('Восстановить'),
+                      ),
+                    if (auth.canHardDelete)
+                      const PopupMenuItem(
+                        value: 'hard',
+                        child: Text('Удалить навсегда'),
+                      ),
+                  ],
+                ];
               },
             ),
           ),

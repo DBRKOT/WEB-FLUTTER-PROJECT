@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,7 +15,8 @@ class SessionGuard extends StatefulWidget {
   State<SessionGuard> createState() => _SessionGuardState();
 }
 
-class _SessionGuardState extends State<SessionGuard> with WidgetsBindingObserver {
+class _SessionGuardState extends State<SessionGuard>
+    with WidgetsBindingObserver {
   Timer? _ticker;
   bool _warningVisible = false;
 
@@ -74,9 +74,7 @@ class _SessionGuardState extends State<SessionGuard> with WidgetsBindingObserver
       }
       await auth.logout(reason: 'неактивность');
       messenger?.showSnackBar(
-        const SnackBar(
-          content: Text('Сессия завершена из‑за неактивности.'),
-        ),
+        const SnackBar(content: Text('Сессия завершена из‑за неактивности.')),
       );
       return;
     }
@@ -90,7 +88,7 @@ class _SessionGuardState extends State<SessionGuard> with WidgetsBindingObserver
         builder: (context) => AlertDialog(
           title: const Text('Сессия скоро завершится'),
           content: Text(
-            'Вы неактивны. Выход через ${sessionWarnSeconds} с.\n'
+            'Вы неактивны. Выход через $sessionWarnSeconds с.\n'
             'Продолжить работу?',
           ),
           actions: [

@@ -23,6 +23,7 @@ import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
+import '../widgets/table_cell_text.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -115,23 +116,18 @@ class _ProductListScreenState extends State<ProductListScreen> {
     };
     final allBrands = {
       for (final b in [...seedBrands, ...brands]) b.id: b,
-    }.values.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
     final allCategories = {
       for (final c in [...seedCategories, ...categories]) c.id: c,
-    }.values.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
     final allSuppliers = {
       for (final s in [...seedSuppliers, ...suppliers]) s.id: s,
-    }.values.toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
 
-    String brandsLabel(Product p) => p.brandIds
-        .map((id) => brandNames[id] ?? '#$id')
-        .join(', ');
-    String categoriesLabel(Product p) => p.categoryIds
-        .map((id) => categoryNames[id] ?? '#$id')
-        .join(', ');
+    String brandsLabel(Product p) =>
+        p.brandIds.map((id) => brandNames[id] ?? '#$id').join(', ');
+    String categoriesLabel(Product p) =>
+        p.categoryIds.map((id) => categoryNames[id] ?? '#$id').join(', ');
 
     return Scaffold(
       appBar: AppBar(
@@ -141,7 +137,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
               notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Center(child: Text('Выбрано: ${notifier.selected.length}')),
+              child: Center(
+                child: Text('Выбрано: ${notifier.selected.length}'),
+              ),
             ),
           if (context.watch<AuthNotifier>().canEditCatalog &&
               notifier.hasSelection)
@@ -152,7 +150,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           IconButton(
             tooltip: 'Показать ошибку загрузки',
-            onPressed: () => context.read<ProductListNotifier>().simulateError(),
+            onPressed: () =>
+                context.read<ProductListNotifier>().simulateError(),
             icon: const Icon(Icons.bug_report_outlined),
           ),
         ],
@@ -193,8 +192,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       items: notifier.result.items,
                       idOf: (p) => p.id,
                       selected: notifier.selected,
-                      onToggleSelect: (id) =>
-                          context.read<ProductListNotifier>().toggleSelection(id),
+                      onToggleSelect: (id) => context
+                          .read<ProductListNotifier>()
+                          .toggleSelection(id),
                       isDeleted: (p) => p.isDeleted,
                       sortField: notifier.query.sortField,
                       sortAscending: notifier.query.sortAscending,
@@ -210,24 +210,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         TableColumnSpec(
                           label: 'Название',
                           sortField: 'name',
-                          build: (p) => Text(p.name),
+                          build: (p) => tableCellText(p.name),
                         ),
                         TableColumnSpec(
                           label: 'Артикул',
                           sortField: 'sku',
-                          build: (p) => Text(p.sku),
+                          build: (p) => tableCellText(p.sku),
                         ),
                         TableColumnSpec(
                           label: 'Категории',
-                          build: (p) => Text(categoriesLabel(p)),
+                          build: (p) => tableCellText(categoriesLabel(p)),
                         ),
                         TableColumnSpec(
                           label: 'Бренды',
-                          build: (p) => Text(brandsLabel(p)),
+                          build: (p) => tableCellText(brandsLabel(p)),
                         ),
                         TableColumnSpec(
                           label: 'Поставщик',
-                          build: (p) => Text(supplierNames[p.supplierId] ?? '—'),
+                          build: (p) =>
+                              tableCellText(supplierNames[p.supplierId] ?? '—'),
                         ),
                         TableColumnSpec(
                           label: 'Год',
@@ -504,7 +505,9 @@ class _ProductFilters extends StatelessWidget {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (value) => onApply(
-                q.copyWith(yearFrom: value.isEmpty ? null : int.tryParse(value)),
+                q.copyWith(
+                  yearFrom: value.isEmpty ? null : int.tryParse(value),
+                ),
               ),
             ),
           ),
@@ -528,8 +531,7 @@ class _ProductFilters extends StatelessWidget {
           FilterChip(
             label: const Text('Показать удалённые'),
             selected: q.includeDeleted,
-            onSelected: (value) =>
-                onApply(q.copyWith(includeDeleted: value)),
+            onSelected: (value) => onApply(q.copyWith(includeDeleted: value)),
           ),
         ],
       ),
@@ -559,15 +561,16 @@ class _ProductCards extends StatelessWidget {
       itemCount: items.length,
       itemBuilder: (context, index) {
         final p = items[index];
-        final brands = p.brandIds.map((id) => brandNames[id] ?? '#$id').join(', ');
-        final cats =
-            p.categoryIds.map((id) => categoryNames[id] ?? '#$id').join(', ');
+        final brands = p.brandIds
+            .map((id) => brandNames[id] ?? '#$id')
+            .join(', ');
+        final cats = p.categoryIds
+            .map((id) => categoryNames[id] ?? '#$id')
+            .join(', ');
         return Card(
           color: p.isDeleted
-              ? Theme.of(context)
-                  .colorScheme
-                  .errorContainer
-                  .withValues(alpha: 0.35)
+              ? Theme.of(context).colorScheme.errorContainer
+                    .withValues(alpha: 0.35)
               : null,
           child: ListTile(
             leading: auth.canEditCatalog

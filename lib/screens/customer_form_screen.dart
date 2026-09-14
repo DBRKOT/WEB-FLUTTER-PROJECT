@@ -72,8 +72,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       _loadError = null;
     });
     try {
-      final existing =
-          await context.read<CustomerListNotifier>().findById(widget.id!);
+      final existing = await context.read<CustomerListNotifier>().findById(
+        widget.id!,
+      );
       if (existing == null) throw StateError('Клиент не найден');
       _fullNameController.text = existing.fullName;
       _emailController.text = existing.email;
@@ -134,9 +135,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       _formKey.currentState!.validate();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(apiErrorMessage(e))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,10 +181,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             }
           },
           validator: (value) {
-            final local = V.combine([
-              V.required('Укажите email'),
-              V.email(),
-            ])(value);
+            final local = V.combine([V.required('Укажите email'), V.email()])(
+              value,
+            );
             if (local != null) return local;
             return _fieldErrors['email'];
           },

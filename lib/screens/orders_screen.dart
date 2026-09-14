@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
 import '../core/auth_notifier.dart';
+import '../core/breakpoints.dart';
 import '../core/permissions.dart';
 import '../models/loan_order.dart';
 import '../repositories/api_loan_service.dart';
@@ -16,7 +17,6 @@ String _fmtDate(DateTime d) {
   return '$dd.$mm.${local.year}';
 }
 
-/// Все заказы магазина — экран менеджера (и админа).
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -72,12 +72,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
       await _load();
     } on ForbiddenException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('403: ${e.message}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('403: ${e.message}')));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -102,6 +102,38 @@ class _OrdersScreenState extends State<OrdersScreen> {
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
             final o = _items[i];
+            final compact = screenSizeOf(context) == ScreenSize.compact;
+            if (compact) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        o.productName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${o.customerName}\nВыдан ${_fmtDate(o.issuedAt)}, до ${_fmtDate(o.dueAt)} · ${o.status}',
+                      ),
+                      if (o.isOpen) ...[
+                        const SizedBox(height: 8),
+                        FilledButton.tonal(
+                          onPressed: () => _returnLoan(o),
+                          child: const Text('Закрыть'),
+                        ),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text('Закрыт'),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }
             return Card(
               child: ListTile(
                 title: Text(o.productName),

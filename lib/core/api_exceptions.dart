@@ -48,20 +48,23 @@ class RequestCancelledException extends ApiException {
 }
 
 ApiException mapHttpError(int status, dynamic body) {
-  final message =
-      (body is Map && body['message'] is String) ? body['message'] as String : null;
+  final message = (body is Map && body['message'] is String)
+      ? body['message'] as String
+      : null;
 
   return switch (status) {
     401 => UnauthorizedException(message ?? 'Требуется вход в систему.'),
-    403 => ForbiddenException(message ?? 'Недостаточно прав для этого действия.'),
+    403 => ForbiddenException(
+      message ?? 'Недостаточно прав для этого действия.',
+    ),
     404 => NotFoundException(message ?? 'Запись не найдена.'),
     409 => ConflictException(message ?? 'Операция невозможна.'),
     422 => ValidationException(
-        message ?? 'Ошибка валидации',
-        (body is Map && body['errors'] is Map)
-            ? (body['errors'] as Map).map((k, v) => MapEntry('$k', '$v'))
-            : const {},
-      ),
+      message ?? 'Ошибка валидации',
+      (body is Map && body['errors'] is Map)
+          ? (body['errors'] as Map).map((k, v) => MapEntry('$k', '$v'))
+          : const {},
+    ),
     _ => ServerException(message ?? 'Неизвестная ошибка (код $status).'),
   };
 }
@@ -77,13 +80,13 @@ ApiException mapDioError(DioException e) {
   return switch (e.type) {
     DioExceptionType.connectionTimeout ||
     DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout =>
-      const NetworkException('Сервер не ответил вовремя.'),
-    DioExceptionType.connectionError =>
-      const NetworkException(
-        'Не удалось соединиться с сервером. '
-        'Если сервер запущен, откройте консоль браузера и проверьте наличие ошибки CORS.',
-      ),
+    DioExceptionType.receiveTimeout => const NetworkException(
+      'Сервер не ответил вовремя.',
+    ),
+    DioExceptionType.connectionError => const NetworkException(
+      'Не удалось соединиться с сервером. '
+      'Если сервер запущен, откройте консоль браузера и проверьте наличие ошибки CORS.',
+    ),
     DioExceptionType.cancel => const RequestCancelledException(),
     _ => const ServerException(),
   };
@@ -107,11 +110,15 @@ Future<T> guardRead<T>(Future<T> Function() action) async {
     } on NetworkException {
       attempt++;
       if (attempt >= 3) rethrow;
-      await Future<void>.delayed(Duration(milliseconds: 250 * attempt * attempt));
+      await Future<void>.delayed(
+        Duration(milliseconds: 250 * attempt * attempt),
+      );
     } on ServerException {
       attempt++;
       if (attempt >= 3) rethrow;
-      await Future<void>.delayed(Duration(milliseconds: 250 * attempt * attempt));
+      await Future<void>.delayed(
+        Duration(milliseconds: 250 * attempt * attempt),
+      );
     }
   }
 }

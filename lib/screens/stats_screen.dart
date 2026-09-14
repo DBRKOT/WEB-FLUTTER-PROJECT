@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
 import '../core/auth_notifier.dart';
+import '../core/breakpoints.dart';
 import '../core/permissions.dart';
 import '../models/product_query.dart';
 import '../repositories/brand_repository.dart';
@@ -41,13 +42,19 @@ class _StatsScreenState extends State<StatsScreen> {
       _error = null;
     });
     try {
-      final products = await context
-          .read<ProductRepository>()
-          .find(const ProductQuery(page: 1, size: 1));
-      final brands = await context.read<BrandRepository>().findAll();
-      final categories = await context.read<CategoryRepository>().findAll();
-      final suppliers = await context.read<SupplierRepository>().findAll();
-      final customers = await context.read<CustomerRepository>().findAll();
+      final productRepo = context.read<ProductRepository>();
+      final brandRepo = context.read<BrandRepository>();
+      final categoryRepo = context.read<CategoryRepository>();
+      final supplierRepo = context.read<SupplierRepository>();
+      final customerRepo = context.read<CustomerRepository>();
+
+      final products = await productRepo.find(
+        const ProductQuery(page: 1, size: 1),
+      );
+      final brands = await brandRepo.findAll();
+      final categories = await categoryRepo.findAll();
+      final suppliers = await supplierRepo.findAll();
+      final customers = await customerRepo.findAll();
 
       if (!mounted) return;
       setState(() {
@@ -95,7 +102,7 @@ class _StatsScreenState extends State<StatsScreen> {
         onRetry: _load,
         child: GridView.count(
           padding: const EdgeInsets.all(16),
-          crossAxisCount: MediaQuery.sizeOf(context).width > 800 ? 3 : 2,
+          crossAxisCount: byScreen(context, compact: 1, medium: 2, expanded: 3),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.6,

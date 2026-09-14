@@ -71,6 +71,7 @@ class EntityFormScaffold extends StatelessWidget {
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(
+            tooltip: 'Назад',
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
               if (!isDirty || saving) {
@@ -103,25 +104,28 @@ class EntityFormScaffold extends StatelessWidget {
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : loadError != null
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(loadError!),
-                        const SizedBox(height: 12),
-                        if (onRetry != null)
-                          FilledButton(
-                            onPressed: onRetry,
-                            child: const Text('Повторить'),
-                          ),
-                      ],
-                    ),
-                  )
-                : Form(
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(loadError!),
+                    const SizedBox(height: 12),
+                    if (onRetry != null)
+                      FilledButton(
+                        onPressed: onRetry,
+                        child: const Text('Повторить'),
+                      ),
+                  ],
+                ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Form(
                     key: formKey,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: ListView(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
                       children: [
                         for (var i = 0; i < fields.length; i++) ...[
                           if (i > 0) const SizedBox(height: 16),
@@ -147,6 +151,8 @@ class EntityFormScaffold extends StatelessWidget {
                       ],
                     ),
                   ),
+                ),
+              ),
       ),
     );
   }

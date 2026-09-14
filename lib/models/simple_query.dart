@@ -19,8 +19,9 @@ class SimpleQuery {
     final q = uri.queryParameters;
     final sortRaw = q['sort'] ?? '$defaultSort,asc';
     final parts = sortRaw.split(',');
-    final field =
-        parts.isNotEmpty && parts.first.isNotEmpty ? parts.first : defaultSort;
+    final field = parts.isNotEmpty && parts.first.isNotEmpty
+        ? parts.first
+        : defaultSort;
     final ascending = parts.length < 2 || parts[1].toLowerCase() != 'desc';
     return SimpleQuery(
       search: q['search'] ?? '',
@@ -78,12 +79,6 @@ class SimpleQuery {
   }
 
   @override
-  int get hashCode => Object.hash(
-        search,
-        sortField,
-        sortAscending,
-        page,
-        size,
-        includeDeleted,
-      );
+  int get hashCode =>
+      Object.hash(search, sortField, sortAscending, page, size, includeDeleted);
 }

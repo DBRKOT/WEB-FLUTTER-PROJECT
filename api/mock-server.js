@@ -11,8 +11,8 @@ function arg(name, fallback) {
   return i !== -1 && args[i + 1] ? args[i + 1] : fallback;
 }
 
-const PORT = Number(arg('port', 8080));
-const ORIGIN = arg('origin', '*');
+const PORT = Number(arg('port', process.env.PORT || 8080));
+const ORIGIN = arg('origin', process.env.CORS_ORIGIN || '*');
 const SECRET = 'учебный-ключ-не-для-продакшена';
 const ACCESS_TTL = Number(arg('ttl', 900));      // секунд
 const REFRESH_TTL = 60 * 60 * 24 * 7;

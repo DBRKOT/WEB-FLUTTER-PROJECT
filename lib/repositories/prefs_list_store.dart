@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/page_result.dart';
 import '../models/simple_query.dart';
 
+// ignore_for_file: prefer_initializing_formals
+
 typedef JsonMap = Map<String, dynamic>;
 
 class PrefsListStore<T> {
@@ -16,13 +18,13 @@ class PrefsListStore<T> {
     required JsonMap Function(T) toJson,
     required int Function(T) idOf,
     required T Function(T item, int id) withId,
-  })  : _prefs = prefs,
-        _key = key,
-        _seed = seed,
-        _fromJson = fromJson,
-        _toJson = toJson,
-        _idOf = idOf,
-        _withId = withId {
+  }) : _prefs = prefs,
+       _key = key,
+       _seed = seed,
+       _fromJson = fromJson,
+       _toJson = toJson,
+       _idOf = idOf,
+       _withId = withId {
     _restore();
   }
 
@@ -114,6 +116,11 @@ class PrefsListStore<T> {
     final from = (q.page - 1) * q.size;
     final to = (from + q.size) > total ? total : (from + q.size);
     final pageItems = from >= total ? <T>[] : rows.sublist(from, to);
-    return PageResult(items: pageItems, page: q.page, size: q.size, total: total);
+    return PageResult(
+      items: pageItems,
+      page: q.page,
+      size: q.size,
+      total: total,
+    );
   }
 }

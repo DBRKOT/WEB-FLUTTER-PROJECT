@@ -38,8 +38,8 @@ class _BrandDetailScreenState extends State<BrandDetailScreen> {
     });
     try {
       final brand = await context.read<BrandListNotifier>().findById(
-            widget.brandId,
-          );
+        widget.brandId,
+      );
       if (!mounted) {
         return;
       }
@@ -64,6 +64,7 @@ class _BrandDetailScreenState extends State<BrandDetailScreen> {
       appBar: AppBar(
         title: Text(_brand?.name ?? 'Карточка бренда'),
         leading: IconButton(
+          tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {

@@ -148,8 +148,9 @@ class _TechStoreAppState extends State<TechStoreApp> {
         ChangeNotifierProvider(
           create: (context) {
             final auth = context.read<AuthNotifier>();
-            final notifier =
-                ProductListNotifier(context.read<ProductRepository>());
+            final notifier = ProductListNotifier(
+              context.read<ProductRepository>(),
+            );
             _loadWhenAuthenticated(auth, notifier.load);
             return notifier;
           },
@@ -190,8 +191,9 @@ class _TechStoreAppState extends State<TechStoreApp> {
         ChangeNotifierProvider(
           create: (context) {
             final auth = context.read<AuthNotifier>();
-            final notifier =
-                CustomerListNotifier(context.read<CustomerRepository>());
+            final notifier = CustomerListNotifier(
+              context.read<CustomerRepository>(),
+            );
             _loadWhenAuthenticated(auth, notifier.load);
             return notifier;
           },
@@ -206,19 +208,15 @@ class _TechStoreAppState extends State<TechStoreApp> {
             seedColor: const Color.fromARGB(255, 109, 55, 217),
           ),
         ),
-        builder: (context, child) => SessionGuard(
-          child: child ?? const SizedBox.shrink(),
-        ),
+        builder: (context, child) =>
+            SessionGuard(child: child ?? const SizedBox.shrink()),
         routerConfig: _router,
       ),
     );
   }
 }
 
-void _loadWhenAuthenticated(
-  AuthNotifier auth,
-  Future<void> Function() load,
-) {
+void _loadWhenAuthenticated(AuthNotifier auth, Future<void> Function() load) {
   if (auth.isAuthenticated) {
     load();
     return;

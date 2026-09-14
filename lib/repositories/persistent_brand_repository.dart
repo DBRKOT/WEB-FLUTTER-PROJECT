@@ -29,8 +29,9 @@ class PersistentBrandRepository implements BrandRepository {
     }
     try {
       final list = jsonDecode(raw) as List;
-      _brands =
-          list.map((e) => Brand.fromJson(e as Map<String, dynamic>)).toList();
+      _brands = list
+          .map((e) => Brand.fromJson(e as Map<String, dynamic>))
+          .toList();
       _nextId = _maxId() + 1;
     } catch (_) {
       _brands = [...seedBrands];
@@ -53,9 +54,7 @@ class PersistentBrandRepository implements BrandRepository {
 
   @override
   Future<List<Brand>> findAll({bool includeDeleted = false}) async {
-    return _brands
-        .where((b) => includeDeleted || !b.isDeleted)
-        .toList()
+    return _brands.where((b) => includeDeleted || !b.isDeleted).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 

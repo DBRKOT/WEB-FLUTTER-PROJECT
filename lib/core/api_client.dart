@@ -79,9 +79,7 @@ Dio buildDio({
       },
       onError: (error, handler) {
         if (kDebugMode) {
-          debugPrint(
-            '[API] сбой ${error.requestOptions.uri}: ${error.type}',
-          );
+          debugPrint('[API] сбой ${error.requestOptions.uri}: ${error.type}');
         }
         return handler.next(error);
       },

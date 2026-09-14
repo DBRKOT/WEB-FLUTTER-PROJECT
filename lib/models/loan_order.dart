@@ -28,15 +28,15 @@ class LoanOrder {
     final book = json['book'];
     return LoanOrder(
       id: json['id'] as int? ?? 0,
-      customerName: reader is Map
-          ? (reader['fullName'] as String? ?? '')
-          : '',
+      customerName: reader is Map ? (reader['fullName'] as String? ?? '') : '',
       productName: book is Map ? (book['title'] as String? ?? '') : '',
       productId: book is Map ? (book['id'] as int? ?? 0) : 0,
       customerId: reader is Map ? (reader['id'] as int? ?? 0) : 0,
-      issuedAt: DateTime.tryParse(json['issuedAt'] as String? ?? '') ??
+      issuedAt:
+          DateTime.tryParse(json['issuedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
-      dueAt: DateTime.tryParse(json['dueAt'] as String? ?? '') ??
+      dueAt:
+          DateTime.tryParse(json['dueAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       returnedAt: json['returnedAt'] == null
           ? null
