@@ -14,9 +14,14 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 Write-Host "base-href = $BaseHref"
 Write-Host "API_BASE_URL = $ApiBaseUrl"
 
+# Flutter пишет подсказки в поток ошибок, поэтому останавливаться на них нельзя:
+# судим об успехе по коду возврата.
+$ErrorActionPreference = "Continue"
 flutter build web --release `
   --base-href $BaseHref `
   --dart-define=API_BASE_URL=$ApiBaseUrl
+if ($LASTEXITCODE -ne 0) { throw "flutter build web завершился с кодом $LASTEXITCODE" }
+$ErrorActionPreference = "Stop"
 
 Copy-Item -Force "$OutDir/index.html" "$OutDir/404.html"
 Write-Host "OK: $OutDir (+ 404.html)"

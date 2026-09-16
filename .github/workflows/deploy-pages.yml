@@ -20,17 +20,15 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
+  # Сайт раздаётся из ветки gh-pages, поэтому задача складывает готовую
+  # сборку туда. Саму публикацию после этого делает встроенный процесс
+  # GitHub «pages build and deployment».
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -42,13 +40,19 @@ jobs:
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
-          API="${API_BASE_URL:-http://localhost:8080/api}"
+          API="${API_BASE_URL:-http://127.0.0.1:8090/api}"
           flutter build web --release \
             --base-href /WEB-FLUTTER-PROJECT/ \
             --dart-define=API_BASE_URL="$API"
           cp build/web/index.html build/web/404.html
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages
+        run: |
+          cd build/web
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "deploy: ${{ github.sha }}"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" \
+            gh-pages
