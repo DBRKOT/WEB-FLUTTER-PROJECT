@@ -20,9 +20,7 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-  # Сайт раздаётся из ветки gh-pages, поэтому задача складывает готовую
-  # сборку туда. Саму публикацию после этого делает встроенный процесс
-  # GitHub «pages build and deployment».
+
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: test
