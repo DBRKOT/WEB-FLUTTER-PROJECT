@@ -75,7 +75,6 @@ class V {
     };
   }
 
-
   static Validator phone({int max = 20}) {
     final re = RegExp(r'^[0-9+()\- ]*$');
     return (value) {
@@ -85,7 +84,6 @@ class V {
       return null;
     };
   }
-
 
   static Validator optional(Validator validator) {
     return (value) =>

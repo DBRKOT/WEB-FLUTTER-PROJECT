@@ -129,7 +129,6 @@ class AppScaffold extends StatelessWidget {
     );
   }
 
-
   Widget _compactNavigation(
     BuildContext context,
     List<({String path, IconData icon, String label})> destinations,

@@ -52,7 +52,6 @@ class RepairOrder {
   final int total;
   final bool archived;
 
-
   final String clientName;
   final String productName;
   final String masterName;

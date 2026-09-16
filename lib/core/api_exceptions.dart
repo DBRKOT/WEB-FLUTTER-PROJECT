@@ -29,7 +29,6 @@ class NotFoundException extends ApiException {
 }
 
 class ConflictException extends ApiException {
-
   final Map<String, String> errors;
   const ConflictException(super.message, [this.errors = const {}]);
 }
@@ -48,7 +47,6 @@ class ServerException extends ApiException {
 class RequestCancelledException extends ApiException {
   const RequestCancelledException([super.message = 'Запрос отменён.']);
 }
-
 
 ({Map<String, String> errors, bool hasConflict}) _parsePbFieldErrors(
   dynamic body,
@@ -109,7 +107,6 @@ ApiException mapHttpError(int status, dynamic body) {
     _ => ServerException(message ?? 'Неизвестная ошибка (код $status).'),
   };
 }
-
 
 ApiException _mapBadRequest(String? message, dynamic body) {
   final parsed = _parsePbFieldErrors(body);

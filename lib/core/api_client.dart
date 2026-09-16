@@ -5,7 +5,6 @@ import 'api_exceptions.dart';
 import 'auth_notifier.dart';
 import 'config.dart';
 
-
 Dio buildDio({
   String? Function()? tokenProvider,
   AuthNotifier? Function()? authProvider,

@@ -26,7 +26,6 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
   final _priceController = TextEditingController();
   final _normHoursController = TextEditingController();
 
-
   final Map<String, String> _serverErrors = {};
 
   bool _loading = true;

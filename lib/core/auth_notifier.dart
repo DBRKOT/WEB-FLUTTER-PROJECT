@@ -8,7 +8,6 @@ import 'api_exceptions.dart';
 import 'config.dart';
 import '../models/app_user.dart';
 
-
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier(this._prefs, this._dio);
 
@@ -96,9 +95,7 @@ class AuthNotifier extends ChangeNotifier {
         await refreshTokens();
       } on UnauthorizedException {
         await logout(reason: 'токен недействителен');
-      } catch (_) {
-
-      }
+      } catch (_) {}
     } finally {
       _restoring = false;
       notifyListeners();
@@ -116,7 +113,6 @@ class AuthNotifier extends ChangeNotifier {
     });
     notifyListeners();
   }
-
 
   Future<void> register({
     required String email,

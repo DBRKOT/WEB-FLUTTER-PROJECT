@@ -21,7 +21,6 @@ String pbSearch(String search, List<String> fields) {
   return pbOr([for (final f in fields) '$f ~ ${pbQuote(text)}']);
 }
 
-
 class PbBrandRepository implements CrudRepository<Brand, BrandQuery> {
   PbBrandRepository(Dio dio)
     : _repo = PbEntityRepository<Brand>(
@@ -74,7 +73,6 @@ class PbBrandRepository implements CrudRepository<Brand, BrandQuery> {
 
   @override
   Future<int> deleteMany(List<String> ids) => _repo.deleteMany(ids);
-
 
   Future<bool> isNameTaken(String name, {String? excludeId}) =>
       _repo.isValueTaken('name', name, excludeId: excludeId);
@@ -129,7 +127,6 @@ class PbCategoryRepository implements CrudRepository<Category, SimpleQuery> {
       _repo.isValueTaken('name', name, excludeId: excludeId);
 }
 
-
 class PbSupplierRepository implements CrudRepository<Supplier, SimpleQuery> {
   PbSupplierRepository(Dio dio)
     : _repo = PbEntityRepository<Supplier>(
@@ -176,7 +173,6 @@ class PbSupplierRepository implements CrudRepository<Supplier, SimpleQuery> {
   Future<int> deleteMany(List<String> ids) => _repo.deleteMany(ids);
 }
 
-
 class PbProductRepository implements CrudRepository<Product, ProductQuery> {
   PbProductRepository(Dio dio)
     : _repo = PbEntityRepository<Product>(
@@ -188,7 +184,6 @@ class PbProductRepository implements CrudRepository<Product, ProductQuery> {
       );
 
   final PbEntityRepository<Product> _repo;
-
 
   String _sortField(String field) => switch (field) {
     'name' => 'title',
@@ -254,7 +249,6 @@ class PbProductRepository implements CrudRepository<Product, ProductQuery> {
       _repo.countWhere('category = ${pbQuote(categoryId)}');
 }
 
-
 class PbStockRepository implements CrudRepository<Stock, SimpleQuery> {
   PbStockRepository(Dio dio)
     : _repo = PbEntityRepository<Stock>(
@@ -308,7 +302,6 @@ class PbStockRepository implements CrudRepository<Stock, SimpleQuery> {
 
   Future<bool> isProductTaken(String productId, {String? excludeId}) =>
       _repo.isValueTaken('product', productId, excludeId: excludeId);
-
 
   Future<Stock?> findByProduct(String productId) async {
     final page = await _repo.findPage(

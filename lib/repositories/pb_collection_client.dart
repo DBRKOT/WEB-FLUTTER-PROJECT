@@ -19,7 +19,6 @@ String pbOr(Iterable<String?> parts) {
   return list.join(' || ');
 }
 
-
 class PbCollectionClient {
   PbCollectionClient(this._dio, this.collection);
 
@@ -131,7 +130,6 @@ class PbCollectionClient {
   }
 }
 
-
 Map<String, dynamic>? pbExpanded(Map<String, dynamic> json, String field) {
   final expand = json['expand'];
   if (expand is! Map) return null;
@@ -151,7 +149,6 @@ List<Map<String, dynamic>> pbExpandedList(
   if (value is Map<String, dynamic>) return [value];
   return const [];
 }
-
 
 List<String> pbIdList(dynamic value) {
   if (value is List) return value.whereType<String>().toList();

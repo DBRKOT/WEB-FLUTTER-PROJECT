@@ -33,7 +33,6 @@ class _RepairFormScreenState extends State<RepairFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _problemController = TextEditingController();
 
-
   final Map<String, String> _serverErrors = {};
 
   String? _clientId;
@@ -197,7 +196,6 @@ class _RepairFormScreenState extends State<RepairFormScreen> {
     archived: _existing?.archived ?? false,
   );
 
-
   Future<String?> _masterBusyError(RepairOrder planned) async {
     if (planned.masterId.isEmpty) return null;
     final schedule = await context.read<RepairListNotifier>().masterSchedule(
@@ -264,7 +262,6 @@ class _RepairFormScreenState extends State<RepairFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final clientValue = _customers.any((c) => c.userId == _clientId)
         ? _clientId
         : null;
@@ -470,7 +467,6 @@ class _RepairFormScreenState extends State<RepairFormScreen> {
     String? Function(DateTime value)? extraCheck,
   }) {
     return FormField<DateTime>(
-
       key: ValueKey('$fieldName-$value-$_startAt'),
       initialValue: value,
       validator: (picked) {
