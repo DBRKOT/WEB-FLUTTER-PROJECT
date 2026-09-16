@@ -4,17 +4,18 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
-import '../core/field_validation_exception.dart';
 import '../core/form_api_errors.dart';
 import '../core/validators.dart';
+import '../models/app_user.dart';
 import '../models/customer.dart';
-import '../state/customer_list_notifier.dart';
+import '../repositories/api_user_repository.dart';
+import '../state/entity_notifiers.dart';
 import '../widgets/entity_form_scaffold.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   const CustomerFormScreen({super.key, this.id});
 
-  final int? id;
+  final String? id;
   bool get isEditing => id != null;
 
   @override
@@ -22,22 +23,23 @@ class CustomerFormScreen extends StatefulWidget {
 }
 
 class _CustomerFormScreenState extends State<CustomerFormScreen> {
-  static const _cardLevels = ['Standard', 'Gold', 'Platinum'];
-
   final _formKey = GlobalKey<FormState>();
-  final _fullNameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _cardNumberController = TextEditingController();
-  final _issuedYearController = TextEditingController();
+  final _addressController = TextEditingController();
 
-  String _cardLevel = 'Standard';
-  Map<String, String> _fieldErrors = {};
+  final Map<String, String> _serverErrors = {};
+
   bool _loading = true;
   bool _saving = false;
   bool _dirty = false;
   String? _loadError;
   Customer? _existing;
+
+  List<AppUser> _users = const [];
+  String? _userId;
+  DateTime? _birthDate;
+
+  bool _usersRestricted = false;
 
   @override
   void initState() {
@@ -49,74 +51,139 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
   @override
   void dispose() {
-    _fullNameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
-    _cardNumberController.dispose();
-    _issuedYearController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
-  void _markDirty([String? _]) {
-    if (!_dirty) setState(() => _dirty = true);
+  void _markDirty(String field) {
+    _serverErrors.remove(field);
+    setState(() => _dirty = true);
   }
 
   Future<void> _bootstrap() async {
-    if (!widget.isEditing) {
-      _issuedYearController.text = '${DateTime.now().year}';
-      setState(() => _loading = false);
-      return;
-    }
     setState(() {
       _loading = true;
       _loadError = null;
     });
+    final notifier = context.read<CustomerListNotifier>();
     try {
-      final existing = await context.read<CustomerListNotifier>().findById(
-        widget.id!,
-      );
-      if (existing == null) throw StateError('Клиент не найден');
-      _fullNameController.text = existing.fullName;
-      _emailController.text = existing.email;
-      _phoneController.text = existing.phone;
-      _cardNumberController.text = existing.card.number;
-      _issuedYearController.text = '${existing.card.issuedYear}';
-      _cardLevel = _cardLevels.contains(existing.card.level)
-          ? existing.card.level
-          : 'Standard';
+      await _loadUsers();
+      if (widget.isEditing) {
+        final existing = await notifier.findById(widget.id!);
+        if (existing == null) throw StateError('Профиль клиента не найден');
+        _phoneController.text = existing.phone;
+        _addressController.text = existing.address;
+        _existing = existing;
+        _userId = existing.userId;
+        _birthDate = existing.birthDate;
+      }
       if (!mounted) return;
       setState(() {
-        _existing = existing;
         _loading = false;
         _dirty = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = '$e';
+        _loadError = apiErrorMessage(e);
         _loading = false;
       });
     }
   }
 
+  Future<void> _loadUsers() async {
+    try {
+      final page = await context.read<ApiUserRepository>().find();
+      _users = page.items;
+      _usersRestricted = false;
+    } on ForbiddenException {
+      _users = const [];
+      _usersRestricted = true;
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    final base = V.optional(V.phone())(value);
+    return base ?? _serverErrors['phone'];
+  }
+
+  String? _validateAddress(String? value) {
+    final base = V.optional(V.length(max: 200))(value);
+    return base ?? _serverErrors['address'];
+  }
+
+  void _applyServerErrors(Map<String, String> errors, String fallback) {
+    const known = {'user', 'phone', 'address', 'birthDate'};
+    final unknown = <String>[];
+    setState(() {
+      _serverErrors.clear();
+      errors.forEach((field, message) {
+        if (known.contains(field)) {
+          _serverErrors[field] = message;
+        } else {
+          unknown.add(message);
+        }
+      });
+    });
+    _formKey.currentState?.validate();
+    if (_serverErrors.isEmpty) {
+      final message = unknown.isEmpty ? fallback : unknown.first;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 25),
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Дата рождения',
+    );
+    if (picked == null) return;
+    setState(() {
+      _birthDate = picked;
+      _dirty = true;
+      _serverErrors.remove('birthDate');
+    });
+  }
+
   Future<void> _submit() async {
-    setState(() => _fieldErrors = {});
+    final userId = _userId;
+    if (userId == null || userId.isEmpty) {
+      _applyServerErrors({
+        'user': 'Выберите учётную запись клиента',
+      }, 'Учётная запись не выбрана');
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _saving = true);
     try {
-      final customer = Customer(
-        id: _existing?.id ?? 0,
-        fullName: _fullNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        card: MembershipCard(
-          number: _cardNumberController.text.trim(),
-          level: _cardLevel,
-          issuedYear: int.parse(_issuedYearController.text.trim()),
-        ),
-        deletedAt: _existing?.deletedAt,
-      );
       final notifier = context.read<CustomerListNotifier>();
+
+      final taken = await notifier.isUserTaken(
+        userId,
+        excludeId: _existing?.id,
+      );
+      if (taken) {
+        if (!mounted) return;
+        _applyServerErrors({
+          'user': 'У этой учётной записи уже есть профиль',
+        }, 'Профиль уже существует');
+        return;
+      }
+
+      final customer = Customer(
+        id: _existing?.id ?? '',
+        userId: userId,
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        birthDate: _birthDate,
+      );
       if (widget.isEditing) {
         await notifier.update(customer);
       } else {
@@ -125,18 +192,16 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       if (!mounted) return;
       setState(() => _dirty = false);
       context.pop();
-    } on FieldValidationException catch (e) {
-      if (!mounted) return;
-      setState(() => _fieldErrors = e.errors);
-      _formKey.currentState!.validate();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      setState(() => _fieldErrors = mapApiFieldErrors(e.errors));
-      _formKey.currentState!.validate();
+      _applyServerErrors(e.errors, e.message);
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      _applyServerErrors(e.errors, e.message);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -147,10 +212,94 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     }
   }
 
+  Widget _userField() {
+    if (widget.isEditing) {
+      return InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Учётная запись',
+          border: OutlineInputBorder(),
+          helperText: 'Владельца профиля изменить нельзя',
+        ),
+        child: Text(_existing?.displayName ?? ''),
+      );
+    }
+    if (_usersRestricted) {
+      return InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Учётная запись',
+          border: const OutlineInputBorder(),
+          errorText: _serverErrors['user'],
+        ),
+        child: const Text(
+          'Список учётных записей доступен только администратору. '
+          'Создать профиль для другого пользователя может он.',
+        ),
+      );
+    }
+    return DropdownButtonFormField<String>(
+      key: const Key('customer-user'),
+      isExpanded: true,
+      initialValue: _userId,
+      decoration: InputDecoration(
+        labelText: 'Учётная запись',
+        border: const OutlineInputBorder(),
+        errorText: _serverErrors['user'],
+      ),
+      items: [
+        for (final user in _users)
+          DropdownMenuItem(
+            value: user.id,
+            child: Text(
+              '${user.displayName} · ${user.role.label}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      validator: (value) =>
+          (value == null || value.isEmpty) ? 'Выберите учётную запись' : null,
+      onChanged: (value) {
+        setState(() {
+          _userId = value;
+          _dirty = true;
+          _serverErrors.remove('user');
+        });
+      },
+    );
+  }
+
+  Widget _birthDateField() {
+    final value = _birthDate;
+    final text = value == null
+        ? 'Не указана'
+        : '${value.day.toString().padLeft(2, '0')}.'
+              '${value.month.toString().padLeft(2, '0')}.${value.year}';
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Дата рождения',
+        border: const OutlineInputBorder(),
+        errorText: _serverErrors['birthDate'],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(text)),
+          TextButton(onPressed: _pickBirthDate, child: const Text('Выбрать')),
+          if (value != null)
+            TextButton(
+              onPressed: () => setState(() {
+                _birthDate = null;
+                _dirty = true;
+              }),
+              child: const Text('Очистить'),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return EntityFormScaffold(
-      title: widget.isEditing ? 'Изменить клиента' : 'Новый клиент',
+      title: widget.isEditing ? 'Изменить профиль' : 'Новый профиль клиента',
       fallbackPath: '/customers',
       formKey: _formKey,
       isDirty: _dirty,
@@ -162,104 +311,28 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       submitLabel: widget.isEditing ? 'Сохранить' : 'Создать',
       fields: [
         FormFieldSpec(
-          label: 'ФИО',
-          controller: _fullNameController,
-          onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите ФИО'),
-            V.length(min: 2, max: 120),
-          ]),
-        ),
-        FormFieldSpec(
-          label: 'Email',
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          onChanged: (_) {
-            _markDirty();
-            if (_fieldErrors.containsKey('email')) {
-              setState(() => _fieldErrors.remove('email'));
-            }
-          },
-          validator: (value) {
-            final local = V.combine([V.required('Укажите email'), V.email()])(
-              value,
-            );
-            if (local != null) return local;
-            return _fieldErrors['email'];
-          },
-        ),
-        FormFieldSpec(
           label: 'Телефон',
           controller: _phoneController,
           keyboardType: TextInputType.phone,
-          onChanged: _markDirty,
-          validator: V.length(max: 30),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9+()\- ]')),
+          ],
+          onChanged: (_) => _markDirty('phone'),
+          validator: _validatePhone,
+        ),
+        FormFieldSpec(
+          label: 'Адрес',
+          controller: _addressController,
+          maxLines: 2,
+          onChanged: (_) => _markDirty('address'),
+          validator: _validateAddress,
         ),
       ],
       extraChildren: [
         const SizedBox(height: 16),
-        InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Клубная карта',
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.fromLTRB(12, 16, 12, 8),
-          ),
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _cardNumberController,
-                decoration: const InputDecoration(
-                  labelText: 'Номер карты',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                onChanged: _markDirty,
-                validator: V.combine([
-                  V.required('Укажите номер карты'),
-                  V.length(min: 3, max: 40),
-                ]),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                // ignore: deprecated_member_use
-                value: _cardLevel,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Уровень',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: [
-                  for (final level in _cardLevels)
-                    DropdownMenuItem(value: level, child: Text(level)),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _cardLevel = value;
-                    _dirty = true;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _issuedYearController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Год выдачи',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                onChanged: _markDirty,
-                validator: V.combine([
-                  V.required('Укажите год'),
-                  V.integer(min: 2000, max: 2100),
-                ]),
-              ),
-            ],
-          ),
-        ),
+        _userField(),
+        const SizedBox(height: 16),
+        _birthDateField(),
       ],
     );
   }

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
-import '../core/field_validation_exception.dart';
 import '../core/form_api_errors.dart';
 import '../core/reference_cache.dart';
 import '../core/validators.dart';
@@ -12,15 +11,13 @@ import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/supplier.dart';
-import '../repositories/seed_data.dart';
-import '../state/product_list_notifier.dart';
+import '../state/entity_notifiers.dart';
 import '../widgets/entity_form_scaffold.dart';
-import '../widgets/id_chip_form_field.dart';
 
 class ProductFormScreen extends StatefulWidget {
   const ProductFormScreen({super.key, this.id});
 
-  final int? id;
+  final String? id;
   bool get isEditing => id != null;
 
   @override
@@ -31,24 +28,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _skuController = TextEditingController();
-  final _yearController = TextEditingController();
   final _priceController = TextEditingController();
-  final _stockTotalController = TextEditingController();
-  final _stockAvailableController = TextEditingController();
+  final _warrantyController = TextEditingController(text: '0');
+  final _descriptionController = TextEditingController();
 
-  int? _supplierId;
-  List<int> _brandIds = [];
-  List<int> _categoryIds = [];
-  Map<String, String> _fieldErrors = {};
+  final Map<String, String> _serverErrors = {};
+
+  List<Brand> _brands = const [];
+  List<Category> _categories = const [];
+  List<Supplier> _suppliers = const [];
+
+  String? _brandId;
+  String? _categoryId;
+  String? _supplierId;
 
   bool _loading = true;
   bool _saving = false;
   bool _dirty = false;
   String? _loadError;
   Product? _existing;
-  List<Brand> _brands = const [];
-  List<Category> _categories = const [];
-  List<Supplier> _suppliers = const [];
 
   @override
   void initState() {
@@ -62,38 +60,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void dispose() {
     _nameController.dispose();
     _skuController.dispose();
-    _yearController.dispose();
     _priceController.dispose();
-    _stockTotalController.dispose();
-    _stockAvailableController.dispose();
+    _warrantyController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
-  void _markDirty([String? _]) {
-    if (!_dirty) setState(() => _dirty = true);
-  }
-
-  List<Brand> get _availableBrands {
-    if (_supplierId == null) return _brands;
-    final allowed = supplierBrandIds[_supplierId] ?? const <int>[];
-    return _brands.where((b) => allowed.contains(b.id)).toList();
-  }
-
-  List<Category> get _availableCategories {
-    if (_supplierId == null) return _categories;
-    final allowed = supplierCategoryIds[_supplierId] ?? const <int>[];
-    return _categories.where((c) => allowed.contains(c.id)).toList();
-  }
-
-  void _onSupplierChanged(int? value) {
-    final allowedBrands = supplierBrandIds[value] ?? const <int>[];
-    final allowedCategories = supplierCategoryIds[value] ?? const <int>[];
-    setState(() {
-      _supplierId = value;
-      _brandIds = _brandIds.where(allowedBrands.contains).toList();
-      _categoryIds = _categoryIds.where(allowedCategories.contains).toList();
-      _dirty = true;
-    });
+  void _markDirty(String field) {
+    _serverErrors.remove(field);
+    if (!_dirty) {
+      setState(() => _dirty = true);
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -103,23 +82,20 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     });
     try {
       final cache = context.read<ReferenceCache>();
-      final productNotifier = context.read<ProductListNotifier>();
+      final notifier = context.read<ProductListNotifier>();
       final brands = await cache.brands();
       final categories = await cache.categories();
       final suppliers = await cache.suppliers();
+
       Product? existing;
       if (widget.isEditing) {
-        existing = await productNotifier.findById(widget.id!);
+        existing = await notifier.findById(widget.id!);
         if (existing == null) throw StateError('Товар не найден');
         _nameController.text = existing.name;
         _skuController.text = existing.sku;
-        _yearController.text = '${existing.year}';
         _priceController.text = '${existing.price}';
-        _stockTotalController.text = '${existing.stockTotal}';
-        _stockAvailableController.text = '${existing.stockAvailable}';
-        _supplierId = existing.supplierId;
-        _brandIds = [...existing.brandIds];
-        _categoryIds = [...existing.categoryIds];
+        _warrantyController.text = '${existing.warrantyMonths}';
+        _descriptionController.text = existing.description;
       }
       if (!mounted) return;
       setState(() {
@@ -127,44 +103,122 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _categories = categories;
         _suppliers = suppliers;
         _existing = existing;
+        _brandId = existing?.brandId.isNotEmpty == true
+            ? existing!.brandId
+            : null;
+        _categoryId = existing?.categoryId.isNotEmpty == true
+            ? existing!.categoryId
+            : null;
+        _supplierId = existing?.supplierId.isNotEmpty == true
+            ? existing!.supplierId
+            : null;
         _loading = false;
         _dirty = false;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadError = e.message;
-        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = '$e';
+        _loadError = apiErrorMessage(e);
         _loading = false;
       });
     }
   }
 
+  String? _validateName(String? value) {
+    final base = V.combine([
+      V.required('Укажите название товара'),
+      V.length(min: 2, max: 160),
+    ])(value);
+    return base ?? _serverErrors['title'];
+  }
+
+  String? _validateSku(String? value) {
+    final base = V.combine([
+      V.required('Укажите артикул'),
+      V.length(min: 3, max: 40),
+    ])(value);
+    return base ?? _serverErrors['sku'];
+  }
+
+  String? _validatePrice(String? value) {
+    final base = V.combine([
+      V.required('Укажите цену'),
+      V.nonNegativeInt('Цена не может быть отрицательной'),
+    ])(value);
+    return base ?? _serverErrors['price'];
+  }
+
+  String? _validateWarranty(String? value) {
+    final base = V.combine([
+      V.required('Укажите срок гарантии в месяцах'),
+      V.integer(min: 0, max: 120),
+    ])(value);
+    return base ?? _serverErrors['warrantyMonths'];
+  }
+
+  String? _validateDescription(String? value) {
+    final base = V.length(max: 2000)(value);
+    return base ?? _serverErrors['description'];
+  }
+
+  void _applyServerErrors(Map<String, String> errors, String fallback) {
+    const known = {
+      'title',
+      'sku',
+      'price',
+      'warrantyMonths',
+      'brand',
+      'category',
+      'supplier',
+      'description',
+    };
+    final unknown = <String>[];
+    setState(() {
+      _serverErrors.clear();
+      errors.forEach((field, message) {
+        if (known.contains(field)) {
+          _serverErrors[field] = message;
+        } else {
+          unknown.add(message);
+        }
+      });
+    });
+    _formKey.currentState?.validate();
+    if (_serverErrors.isEmpty) {
+      final message = unknown.isEmpty ? fallback : unknown.first;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   Future<void> _submit() async {
-    setState(() => _fieldErrors = {});
     if (!_formKey.currentState!.validate()) return;
-    _formKey.currentState!.save();
     setState(() => _saving = true);
     try {
-      final product = Product(
-        id: _existing?.id ?? 0,
-        name: _nameController.text.trim(),
-        sku: _skuController.text.trim(),
-        year: int.parse(_yearController.text.trim()),
-        price: int.parse(_priceController.text.trim()),
-        supplierId: _supplierId!,
-        brandIds: [..._brandIds],
-        categoryIds: [..._categoryIds],
-        stockTotal: int.parse(_stockTotalController.text.trim()),
-        stockAvailable: int.parse(_stockAvailableController.text.trim()),
-        deletedAt: _existing?.deletedAt,
-      );
+      final sku = _skuController.text.trim();
       final notifier = context.read<ProductListNotifier>();
+
+      final taken = await notifier.isSkuTaken(sku, excludeId: _existing?.id);
+      if (taken) {
+        if (!mounted) return;
+        _applyServerErrors({
+          'sku': 'Товар с таким артикулом уже есть',
+        }, 'Артикул занят');
+        return;
+      }
+
+      final product = Product(
+        id: _existing?.id ?? '',
+        name: _nameController.text.trim(),
+        sku: sku,
+        price: int.parse(_priceController.text.trim()),
+        warrantyMonths: int.parse(_warrantyController.text.trim()),
+        brandId: _brandId ?? '',
+        categoryId: _categoryId ?? '',
+        supplierId: _supplierId ?? '',
+        description: _descriptionController.text.trim(),
+        archived: _existing?.archived ?? false,
+      );
       if (widget.isEditing) {
         await notifier.update(product);
       } else {
@@ -173,22 +227,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       if (!mounted) return;
       setState(() => _dirty = false);
       context.pop();
-    } on FieldValidationException catch (e) {
-      if (!mounted) return;
-      setState(() => _fieldErrors = e.errors);
-      _formKey.currentState!.validate();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      setState(() => _fieldErrors = mapApiFieldErrors(e.errors));
-      _formKey.currentState!.validate();
+      _applyServerErrors(e.errors, e.message);
     } on ConflictException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      _applyServerErrors(e.errors, e.message);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -211,168 +259,118 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       loadError: _loadError,
       onRetry: _bootstrap,
       onSubmit: _submit,
-      submitLabel: widget.isEditing ? 'Сохранить изменения' : 'Создать товар',
+      submitLabel: widget.isEditing ? 'Сохранить' : 'Создать',
       fields: [
         FormFieldSpec(
           label: 'Название',
           controller: _nameController,
-          onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите название'),
-            V.length(min: 2, max: 120),
-          ]),
+          onChanged: (_) => _markDirty('title'),
+          validator: _validateName,
         ),
         FormFieldSpec(
-          label: 'Артикул (SKU)',
+          label: 'Артикул',
           controller: _skuController,
-          onChanged: (_) {
-            _markDirty();
-            if (_fieldErrors.containsKey('sku')) {
-              setState(() => _fieldErrors.remove('sku'));
-            }
-          },
-          validator: (value) {
-            final local = V.combine([
-              V.required('Укажите артикул'),
-              V.length(min: 3, max: 40),
-            ])(value);
-            if (local != null) return local;
-            return _fieldErrors['sku'];
-          },
-        ),
-        FormFieldSpec(
-          label: 'Год выпуска',
-          controller: _yearController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите год'),
-            V.integer(min: 1970, max: 2100),
-          ]),
+          onChanged: (_) => _markDirty('sku'),
+          validator: _validateSku,
         ),
         FormFieldSpec(
           label: 'Цена, ₽',
           controller: _priceController,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите цену'),
-            V.positiveInt('Цена должна быть больше 0'),
-          ]),
+          onChanged: (_) => _markDirty('price'),
+          validator: _validatePrice,
+        ),
+        FormFieldSpec(
+          label: 'Гарантия, месяцев (от 0 до 120)',
+          controller: _warrantyController,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => _markDirty('warrantyMonths'),
+          validator: _validateWarranty,
+        ),
+        FormFieldSpec(
+          label: 'Описание',
+          controller: _descriptionController,
+          keyboardType: TextInputType.multiline,
+          maxLines: 5,
+          onChanged: (_) => _markDirty('description'),
+          validator: _validateDescription,
         ),
       ],
       extraChildren: [
         const SizedBox(height: 16),
-        DropdownButtonFormField<int>(
-          // ignore: deprecated_member_use
-          value: _supplierId,
+        DropdownButtonFormField<String>(
+          key: const Key('product-form-brand'),
           isExpanded: true,
+          initialValue: _brandId,
+          decoration: const InputDecoration(
+            labelText: 'Бренд',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            for (final b in _brands)
+              DropdownMenuItem(
+                value: b.id,
+                child: Text(b.name, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Выберите бренд'
+              : _serverErrors['brand'],
+          onChanged: (value) {
+            _brandId = value;
+            _markDirty('brand');
+          },
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          key: const Key('product-form-category'),
+          isExpanded: true,
+          initialValue: _categoryId,
+          decoration: const InputDecoration(
+            labelText: 'Категория',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            for (final c in _categories)
+              DropdownMenuItem(
+                value: c.id,
+                child: Text(c.name, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Выберите категорию'
+              : _serverErrors['category'],
+          onChanged: (value) {
+            _categoryId = value;
+            _markDirty('category');
+          },
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          key: const Key('product-form-supplier'),
+          isExpanded: true,
+          initialValue: _supplierId,
           decoration: const InputDecoration(
             labelText: 'Поставщик',
             border: OutlineInputBorder(),
-            helperText: 'После выбора сузятся бренды и категории',
           ),
           items: [
+            const DropdownMenuItem(value: null, child: Text('не указан')),
             for (final s in _suppliers)
               DropdownMenuItem(
                 value: s.id,
                 child: Text(s.name, overflow: TextOverflow.ellipsis),
               ),
           ],
-          onChanged: _onSupplierChanged,
-          validator: (value) => value == null ? 'Выберите поставщика' : null,
-        ),
-        const SizedBox(height: 16),
-        IdChipFormField(
-          key: ValueKey('brands-$_supplierId'),
-          label: _supplierId == null
-              ? 'Бренды (сначала выберите поставщика)'
-              : 'Бренды (доступны для выбранного поставщика)',
-          emptyError: 'Выберите хотя бы один бренд',
-          initialValue: _brandIds,
-          options: [for (final b in _availableBrands) (id: b.id, name: b.name)],
-          onSaved: (value) => _brandIds = value ?? [],
+          validator: (_) => _serverErrors['supplier'],
           onChanged: (value) {
-            _brandIds = value;
-            _markDirty();
-          },
-        ),
-        const SizedBox(height: 16),
-        IdChipFormField(
-          key: ValueKey('categories-$_supplierId'),
-          label: _supplierId == null
-              ? 'Категории (сначала выберите поставщика)'
-              : 'Категории (доступны для выбранного поставщика)',
-          emptyError: 'Выберите хотя бы одну категорию',
-          initialValue: _categoryIds,
-          options: [
-            for (final c in _availableCategories) (id: c.id, name: c.name),
-          ],
-          onSaved: (value) => _categoryIds = value ?? [],
-          onChanged: (value) {
-            _categoryIds = value;
-            _markDirty();
-          },
-        ),
-        const SizedBox(height: 16),
-        FormFieldSpec(
-          label: 'Всего на складе',
-          controller: _stockTotalController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) {
-            _markDirty();
-            setState(() {});
-          },
-          validator: V.combine([
-            V.required('Укажите количество'),
-            V.positiveInt(),
-          ]),
-        ).buildField(),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _stockAvailableController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            labelText: 'Доступно',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: _markDirty,
-          validator: (value) {
-            final base = V.combine([
-              V.required('Укажите количество'),
-              V.nonNegativeInt(),
-            ])(value);
-            if (base != null) return base;
-            final available = int.parse(value!.trim());
-            final total = int.tryParse(_stockTotalController.text.trim());
-            if (total != null && available > total) {
-              return 'Не больше общего количества';
-            }
-            return null;
+            _supplierId = value;
+            _markDirty('supplier');
           },
         ),
       ],
-    );
-  }
-}
-
-extension on FormFieldSpec {
-  Widget buildField() {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-      validator: validator,
-      onChanged: onChanged,
     );
   }
 }

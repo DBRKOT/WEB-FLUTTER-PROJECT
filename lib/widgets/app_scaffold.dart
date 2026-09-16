@@ -36,11 +36,34 @@ class AppScaffold extends StatelessWidget {
         (path: '/orders', icon: Icons.assignment_outlined, label: 'Заказы'),
       ]);
     }
+
+    if (auth.canManageService) {
+      items.addAll([
+        (path: '/services', icon: Icons.build_outlined, label: 'Услуги'),
+        (path: '/masters', icon: Icons.engineering_outlined, label: 'Мастера'),
+        (path: '/repairs', icon: Icons.handyman_outlined, label: 'Заявки'),
+      ]);
+    }
+    //склад — раздел администратора.
+    if (auth.canManageStock) {
+      items.add((
+        path: '/stock',
+        icon: Icons.inventory_2_outlined,
+        label: 'Склад',
+      ));
+    }
     if (auth.canViewMyOrders) {
       items.add((
         path: '/my-orders',
         icon: Icons.shopping_bag_outlined,
         label: 'Мои заказы',
+      ));
+    }
+    if (auth.canViewMyRepairs) {
+      items.add((
+        path: '/my-repairs',
+        icon: Icons.build_circle_outlined,
+        label: 'Мои заявки',
       ));
     }
     if (auth.canManageUsers) {
@@ -101,6 +124,66 @@ class AppScaffold extends StatelessWidget {
           ok
               ? 'Профиль перечитан из localStorage'
               : 'В localStorage нет auth_user_json',
+        ),
+      ),
+    );
+  }
+
+
+  Widget _compactNavigation(
+    BuildContext context,
+    List<({String path, IconData icon, String label})> destinations,
+    int index,
+  ) {
+    const maxTabs = 4;
+    final fitsCompletely = destinations.length <= maxTabs + 1;
+    final visible = fitsCompletely
+        ? destinations
+        : destinations.take(maxTabs).toList();
+    final hidden = destinations.skip(visible.length).toList();
+
+    return NavigationBar(
+      selectedIndex: index < visible.length ? index : visible.length,
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      onDestinationSelected: (i) {
+        if (i < visible.length) {
+          _onSelect(context, visible[i].path);
+        } else {
+          _showMoreSections(context, hidden);
+        }
+      },
+      destinations: [
+        for (final d in visible)
+          NavigationDestination(icon: Icon(d.icon), label: d.label),
+        if (hidden.isNotEmpty)
+          const NavigationDestination(
+            icon: Icon(Icons.more_horiz),
+            label: 'Ещё',
+          ),
+      ],
+    );
+  }
+
+  void _showMoreSections(
+    BuildContext context,
+    List<({String path, IconData icon, String label})> sections,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final s in sections)
+              ListTile(
+                leading: Icon(s.icon),
+                title: Text(s.label),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _onSelect(context, s.path);
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -194,18 +277,7 @@ class AppScaffold extends StatelessWidget {
           ],
         ),
         body: child,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          labelBehavior: destinations.length > 3
-              ? NavigationDestinationLabelBehavior.onlyShowSelected
-              : NavigationDestinationLabelBehavior.alwaysShow,
-          onDestinationSelected: (i) =>
-              _onSelect(context, destinations[i].path),
-          destinations: [
-            for (final d in destinations)
-              NavigationDestination(icon: Icon(d.icon), label: d.label),
-          ],
-        ),
+        bottomNavigationBar: _compactNavigation(context, destinations, index),
       );
     }
 

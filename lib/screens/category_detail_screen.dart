@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/auth_notifier.dart';
+import '../core/form_api_errors.dart';
+import '../core/permissions.dart';
 import '../models/category.dart';
-import '../state/category_list_notifier.dart';
+import '../models/product_query.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
 import '../widgets/load_state_view.dart';
 
 class CategoryDetailScreen extends StatefulWidget {
   const CategoryDetailScreen({super.key, required this.categoryId});
 
-  final int categoryId;
+  final String categoryId;
 
   @override
   State<CategoryDetailScreen> createState() => _CategoryDetailScreenState();
@@ -46,76 +50,119 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Не удалось загрузить категорию: $e';
+        _error = 'Не удалось загрузить категорию: ${apiErrorMessage(e)}';
         _status = LoadStatus.error;
       });
     }
   }
 
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/categories');
+    }
+  }
+
+  Future<void> _confirmDelete(Category category) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удаление категории'),
+        content: Text('Удалить категорию «${category.name}» навсегда?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await context.read<CategoryListNotifier>().softDelete(category.id);
+      if (!mounted) return;
+      context.go('/categories');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось удалить: ${apiErrorMessage(e)}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthNotifier>();
+    final category = _category;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_category?.name ?? 'Категория'),
+        title: Text(category?.name ?? 'Карточка категории'),
         leading: IconButton(
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/categories');
-            }
-          },
+          onPressed: _goBack,
         ),
         actions: [
-          if (_category != null && !_category!.isDeleted)
+          if (category != null && auth.canEditCatalog)
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () =>
-                  context.push('/categories/${_category!.id}/edit'),
+              onPressed: () => context.push('/categories/${category.id}/edit'),
+            ),
+          if (category != null && auth.canHardDelete)
+            IconButton(
+              tooltip: 'Удалить',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _confirmDelete(category),
             ),
         ],
       ),
       body: LoadStateView(
         status: _status,
         error: _error,
-        isEmpty: _category == null,
+        isEmpty: category == null,
         emptyMessage: 'Категория не найдена',
         onRetry: _load,
-        child: _category == null
+        child: category == null
             ? const SizedBox.shrink()
             : Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
+                  constraints: const BoxConstraints(maxWidth: 720),
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(24),
                     children: [
-                      ListTile(
-                        dense: true,
-                        title: const Text('Название'),
-                        subtitle: Text(_category!.name),
-                      ),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Описание'),
-                        subtitle: Text(
-                          _category!.description.isEmpty
-                              ? '—'
-                              : _category!.description,
+                      Card(
+                        child: Column(
+                          children: [
+                            ListTile(
+                              title: const Text('Название'),
+                              subtitle: Text(category.name),
+                            ),
+                            ListTile(
+                              title: const Text('Описание'),
+                              subtitle: Text(
+                                category.description.isEmpty
+                                    ? '—'
+                                    : category.description,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (_category!.isDeleted)
-                        ListTile(
-                          dense: true,
-                          title: const Text('Статус'),
-                          subtitle: const Text('Удалена'),
-                          leading: Icon(
-                            Icons.delete_outline,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                      const SizedBox(height: 16),
+                      FilledButton.tonalIcon(
+                        onPressed: () => context.go(
+                          ProductQuery(categoryId: category.id).toLocation(),
                         ),
+                        icon: const Icon(Icons.inventory_2_outlined),
+                        label: const Text('Товары категории'),
+                      ),
                     ],
                   ),
                 ),

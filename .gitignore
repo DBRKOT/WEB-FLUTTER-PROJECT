@@ -47,3 +47,10 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# PocketBase: бинарник и локальная база не хранятся в репозитории
+/pb/pocketbase.exe
+/pb/pocketbase
+/pb/pb_data/
+/pb/CHANGELOG.md
+/pb/LICENSE.md

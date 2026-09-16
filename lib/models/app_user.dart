@@ -1,31 +1,31 @@
 enum UserRole {
-  reader,
-  librarian,
+  client,
+  manager,
   admin;
 
   static UserRole fromApi(String? value) {
     return switch (value) {
       'admin' => UserRole.admin,
-      'librarian' => UserRole.librarian,
-      _ => UserRole.reader,
+      'manager' => UserRole.manager,
+      _ => UserRole.client,
     };
   }
 
   String get apiValue => switch (this) {
     UserRole.admin => 'admin',
-    UserRole.librarian => 'librarian',
-    UserRole.reader => 'reader',
+    UserRole.manager => 'manager',
+    UserRole.client => 'client',
   };
 
   String get label => switch (this) {
     UserRole.admin => 'Администратор',
-    UserRole.librarian => 'Менеджер',
-    UserRole.reader => 'Клиент',
+    UserRole.manager => 'Менеджер сервиса',
+    UserRole.client => 'Клиент',
   };
 
   int get level => switch (this) {
-    UserRole.reader => 1,
-    UserRole.librarian => 2,
+    UserRole.client => 1,
+    UserRole.manager => 2,
     UserRole.admin => 3,
   };
 }
@@ -33,56 +33,49 @@ enum UserRole {
 class AppUser {
   const AppUser({
     required this.id,
-    required this.username,
-    required this.fullName,
     required this.email,
+    required this.fullName,
     required this.role,
-    this.readerId,
+    this.verified = false,
   });
 
-  final int id;
-  final String username;
-  final String fullName;
+  final String id;
   final String email;
+  final String fullName;
   final UserRole role;
-  final int? readerId;
+  final bool verified;
 
-  String get displayName =>
-      fullName.trim().isEmpty ? username : fullName.trim();
+  String get displayName => fullName.trim().isEmpty ? email : fullName.trim();
 
   AppUser copyWith({
-    int? id,
-    String? username,
-    String? fullName,
+    String? id,
     String? email,
+    String? fullName,
     UserRole? role,
-    int? readerId,
+    bool? verified,
   }) {
     return AppUser(
       id: id ?? this.id,
-      username: username ?? this.username,
-      fullName: fullName ?? this.fullName,
       email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
       role: role ?? this.role,
-      readerId: readerId ?? this.readerId,
+      verified: verified ?? this.verified,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'username': username,
-    'fullName': fullName,
     'email': email,
+    'fullName': fullName,
     'role': role.apiValue,
-    'readerId': readerId,
+    'verified': verified,
   };
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
-    id: json['id'] as int? ?? 0,
-    username: json['username'] as String? ?? '',
-    fullName: json['fullName'] as String? ?? '',
+    id: json['id'] as String? ?? '',
     email: json['email'] as String? ?? '',
+    fullName: (json['fullName'] ?? json['name'] ?? '') as String,
     role: UserRole.fromApi(json['role'] as String?),
-    readerId: json['readerId'] as int?,
+    verified: json['verified'] as bool? ?? false,
   );
 }

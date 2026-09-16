@@ -5,12 +5,12 @@ import '../core/api_exceptions.dart';
 import '../core/auth_notifier.dart';
 import '../core/breakpoints.dart';
 import '../core/permissions.dart';
+import '../core/reference_cache.dart';
+import '../models/order_query.dart';
 import '../models/product_query.dart';
-import '../repositories/brand_repository.dart';
-import '../repositories/category_repository.dart';
-import '../repositories/customer_repository.dart';
-import '../repositories/product_repository.dart';
-import '../repositories/supplier_repository.dart';
+import '../models/simple_query.dart';
+import '../repositories/catalog_repositories.dart';
+import '../repositories/service_repositories.dart';
 import '../state/load_status.dart';
 import '../widgets/load_state_view.dart';
 
@@ -24,11 +24,7 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   LoadStatus _status = LoadStatus.idle;
   String? _error;
-  int _products = 0;
-  int _brands = 0;
-  int _categories = 0;
-  int _suppliers = 0;
-  int _customers = 0;
+  final _counts = <String, int>{};
 
   @override
   void initState() {
@@ -42,27 +38,37 @@ class _StatsScreenState extends State<StatsScreen> {
       _error = null;
     });
     try {
-      final productRepo = context.read<ProductRepository>();
-      final brandRepo = context.read<BrandRepository>();
-      final categoryRepo = context.read<CategoryRepository>();
-      final supplierRepo = context.read<SupplierRepository>();
-      final customerRepo = context.read<CustomerRepository>();
+      final products = context.read<PbProductRepository>();
+      final stock = context.read<PbStockRepository>();
+      final customers = context.read<PbCustomerRepository>();
+      final orders = context.read<PbOrderRepository>();
+      final cache = context.read<ReferenceCache>();
 
-      final products = await productRepo.find(
-        const ProductQuery(page: 1, size: 1),
-      );
-      final brands = await brandRepo.findAll();
-      final categories = await categoryRepo.findAll();
-      final suppliers = await supplierRepo.findAll();
-      final customers = await customerRepo.findAll();
+      final productPage = await products.find(const ProductQuery(size: 1));
+      final stockPage = await stock.find(const SimpleQuery(size: 1));
+      final customerPage = await customers.find(const SimpleQuery(size: 1));
+      final orderPage = await orders.find(const OrderQuery(size: 1));
+      final brands = await cache.brands();
+      final categories = await cache.categories();
+      final suppliers = await cache.suppliers();
+      final services = await cache.services();
+      final masters = await cache.masters();
 
       if (!mounted) return;
       setState(() {
-        _products = products.total;
-        _brands = brands.length;
-        _categories = categories.length;
-        _suppliers = suppliers.length;
-        _customers = customers.length;
+        _counts
+          ..clear()
+          ..addAll({
+            'Товары': productPage.total,
+            'Бренды': brands.length,
+            'Категории': categories.length,
+            'Поставщики': suppliers.length,
+            'Складские записи': stockPage.total,
+            'Клиенты': customerPage.total,
+            'Заказы': orderPage.total,
+            'Услуги': services.length,
+            'Мастера': masters.length,
+          });
         _status = LoadStatus.success;
       });
     } on ForbiddenException catch (e) {
@@ -86,6 +92,18 @@ class _StatsScreenState extends State<StatsScreen> {
     }
   }
 
+  static const _icons = <String, IconData>{
+    'Товары': Icons.devices,
+    'Бренды': Icons.factory_outlined,
+    'Категории': Icons.category_outlined,
+    'Поставщики': Icons.local_shipping_outlined,
+    'Складские записи': Icons.inventory_2_outlined,
+    'Клиенты': Icons.people_outline,
+    'Заказы': Icons.assignment_outlined,
+    'Услуги': Icons.build_outlined,
+    'Мастера': Icons.engineering_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
     if (!context.watch<AuthNotifier>().canViewStats) {
@@ -107,16 +125,13 @@ class _StatsScreenState extends State<StatsScreen> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.6,
           children: [
-            _tile(context, 'Товары', _products, Icons.devices),
-            _tile(context, 'Бренды', _brands, Icons.factory_outlined),
-            _tile(context, 'Категории', _categories, Icons.category_outlined),
-            _tile(
-              context,
-              'Поставщики',
-              _suppliers,
-              Icons.local_shipping_outlined,
-            ),
-            _tile(context, 'Клиенты', _customers, Icons.people_outline),
+            for (final entry in _counts.entries)
+              _tile(
+                context,
+                entry.key,
+                entry.value,
+                _icons[entry.key] ?? Icons.dataset_outlined,
+              ),
           ],
         ),
       ),
@@ -133,7 +148,7 @@ class _StatsScreenState extends State<StatsScreen> {
             Icon(icon, color: Theme.of(context).colorScheme.primary),
             const Spacer(),
             Text('$value', style: Theme.of(context).textTheme.headlineMedium),
-            Text(label),
+            Text(label, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),

@@ -9,17 +9,14 @@ import '../core/auth_notifier.dart';
 import '../core/breakpoints.dart';
 import '../core/format.dart';
 import '../core/permissions.dart';
+import '../core/reference_cache.dart';
 import '../models/brand.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
 import '../models/supplier.dart';
-import '../repositories/seed_data.dart';
-import '../state/brand_list_notifier.dart';
-import '../state/category_list_notifier.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
-import '../state/product_list_notifier.dart';
-import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
@@ -34,14 +31,26 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   Timer? _searchDebounce;
+  Timer? _priceDebounce;
   late final TextEditingController _searchController;
+  late final TextEditingController _priceFromController;
+  late final TextEditingController _priceToController;
   String? _lastSyncedLocation;
   bool _applyingFromUrl = false;
+
+  List<Brand> _brands = const [];
+  List<Category> _categories = const [];
+  List<Supplier> _suppliers = const [];
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _priceFromController = TextEditingController();
+    _priceToController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadReferences();
+    });
   }
 
   @override
@@ -53,8 +62,29 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _priceDebounce?.cancel();
     _searchController.dispose();
+    _priceFromController.dispose();
+    _priceToController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReferences() async {
+    final cache = context.read<ReferenceCache>();
+    try {
+      final brands = await cache.brands();
+      final categories = await cache.categories();
+      final suppliers = await cache.suppliers();
+      if (!mounted) return;
+      setState(() {
+        _brands = brands;
+        _categories = categories;
+        _suppliers = suppliers;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {});
+    }
   }
 
   void _syncFromUrl() {
@@ -64,20 +94,24 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
     final fromUrl = ProductQuery.fromUri(GoRouterState.of(context).uri);
     final notifier = context.read<ProductListNotifier>();
+    _syncFields(fromUrl);
     if (fromUrl == notifier.query) {
-      if (_searchController.text != fromUrl.search) {
-        _searchController.text = fromUrl.search;
-      }
+      if (notifier.status == LoadStatus.idle) notifier.load();
       return;
     }
 
     _applyingFromUrl = true;
-    if (_searchController.text != fromUrl.search) {
-      _searchController.text = fromUrl.search;
-    }
     notifier.applyQuery(fromUrl).whenComplete(() {
       _applyingFromUrl = false;
     });
+  }
+
+  void _syncFields(ProductQuery q) {
+    if (_searchController.text != q.search) _searchController.text = q.search;
+    final from = q.priceFrom?.toString() ?? '';
+    if (_priceFromController.text != from) _priceFromController.text = from;
+    final to = q.priceTo?.toString() ?? '';
+    if (_priceToController.text != to) _priceToController.text = to;
   }
 
   Future<void> _apply(ProductQuery next) async {
@@ -91,58 +125,44 @@ class _ProductListScreenState extends State<ProductListScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
       final q = context.read<ProductListNotifier>().query;
       _apply(q.copyWith(search: value));
+    });
+  }
+
+  void _onPriceChanged(String _) {
+    _priceDebounce?.cancel();
+    _priceDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final q = context.read<ProductListNotifier>().query;
+      _apply(
+        q.copyWith(
+          priceFrom: int.tryParse(_priceFromController.text.trim()),
+          priceTo: int.tryParse(_priceToController.text.trim()),
+        ),
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<ProductListNotifier>();
-    final brands = context.watch<BrandListNotifier>().result.items;
-    final categories = context.watch<CategoryListNotifier>().result.items;
-    final suppliers = context.watch<SupplierListNotifier>().result.items;
-    final brandNames = {
-      for (final b in seedBrands) b.id: b.name,
-      for (final b in brands) b.id: b.name,
-    };
-    final categoryNames = {
-      for (final c in seedCategories) c.id: c.name,
-      for (final c in categories) c.id: c.name,
-    };
-    final supplierNames = {
-      for (final s in seedSuppliers) s.id: s.name,
-      for (final s in suppliers) s.id: s.name,
-    };
-    final allBrands = {
-      for (final b in [...seedBrands, ...brands]) b.id: b,
-    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
-    final allCategories = {
-      for (final c in [...seedCategories, ...categories]) c.id: c,
-    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
-    final allSuppliers = {
-      for (final s in [...seedSuppliers, ...suppliers]) s.id: s,
-    }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
-
-    String brandsLabel(Product p) =>
-        p.brandIds.map((id) => brandNames[id] ?? '#$id').join(', ');
-    String categoriesLabel(Product p) =>
-        p.categoryIds.map((id) => categoryNames[id] ?? '#$id').join(', ');
+    final auth = context.watch<AuthNotifier>();
+    final q = notifier.query;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Каталог товаров'),
         actions: [
-          if (context.watch<AuthNotifier>().canEditCatalog &&
-              notifier.hasSelection)
+          if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Center(
                 child: Text('Выбрано: ${notifier.selected.length}'),
               ),
             ),
-          if (context.watch<AuthNotifier>().canEditCatalog &&
-              notifier.hasSelection)
+          if (notifier.hasSelection && auth.canEditCatalog)
             IconButton(
               tooltip: 'Удалить выбранные',
               onPressed: () => _confirmDeleteSelected(context),
@@ -156,7 +176,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
-      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+      floatingActionButton: auth.canEditCatalog
           ? FloatingActionButton(
               tooltip: 'Новый товар',
               onPressed: () => context.push('/products/new'),
@@ -165,14 +185,160 @@ class _ProductListScreenState extends State<ProductListScreen> {
           : null,
       body: Column(
         children: [
-          _ProductFilters(
-            notifier: notifier,
-            brands: allBrands,
-            categories: allCategories,
-            suppliers: allSuppliers,
-            searchController: _searchController,
-            onSearchChanged: _onSearchChanged,
-            onApply: _apply,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 260,
+                  child: TextField(
+                    key: const Key('product-search'),
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'Поиск: название, артикул, описание',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('product-brand-${q.brandId}'),
+                    isExpanded: true,
+                    initialValue: q.brandId,
+                    decoration: const InputDecoration(
+                      labelText: 'Бренд',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Все')),
+                      for (final b in _brands)
+                        DropdownMenuItem(
+                          value: b.id,
+                          child: Text(b.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (value) => _apply(q.copyWith(brandId: value)),
+                  ),
+                ),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('product-category-${q.categoryId}'),
+                    isExpanded: true,
+                    initialValue: q.categoryId,
+                    decoration: const InputDecoration(
+                      labelText: 'Категория',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Все')),
+                      for (final c in _categories)
+                        DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (value) => _apply(q.copyWith(categoryId: value)),
+                  ),
+                ),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('product-supplier-${q.supplierId}'),
+                    isExpanded: true,
+                    initialValue: q.supplierId,
+                    decoration: const InputDecoration(
+                      labelText: 'Поставщик',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Все')),
+                      for (final s in _suppliers)
+                        DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (value) => _apply(q.copyWith(supplierId: value)),
+                  ),
+                ),
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                    key: const Key('product-price-from'),
+                    controller: _priceFromController,
+                    decoration: const InputDecoration(
+                      labelText: 'Цена от',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: _onPriceChanged,
+                  ),
+                ),
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                    key: const Key('product-price-to'),
+                    controller: _priceToController,
+                    decoration: const InputDecoration(
+                      labelText: 'Цена до',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: _onPriceChanged,
+                  ),
+                ),
+                SizedBox(
+                  width: 180,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('product-sort-${q.sortField}'),
+                    isExpanded: true,
+                    initialValue: q.sortField,
+                    decoration: const InputDecoration(
+                      labelText: 'Сортировка',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'name', child: Text('Название')),
+                      DropdownMenuItem(value: 'price', child: Text('Цена')),
+                      DropdownMenuItem(value: 'sku', child: Text('Артикул')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) _apply(q.copyWith(sortField: value));
+                    },
+                  ),
+                ),
+                IconButton(
+                  tooltip: q.sortAscending ? 'По возрастанию' : 'По убыванию',
+                  onPressed: () =>
+                      _apply(q.copyWith(sortAscending: !q.sortAscending)),
+                  icon: Icon(
+                    q.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                  ),
+                ),
+                FilterChip(
+                  label: const Text('Показать удалённые'),
+                  selected: q.includeDeleted,
+                  onSelected: (value) =>
+                      _apply(q.copyWith(includeDeleted: value)),
+                ),
+              ],
+            ),
           ),
           Expanded(
             child: LoadStateView(
@@ -184,9 +350,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
               child: screenSizeOf(context) == ScreenSize.compact
                   ? _ProductCards(
                       items: notifier.result.items,
-                      brandNames: brandNames,
-                      categoryNames: categoryNames,
                       selected: notifier.selected,
+                      onSoftDelete: (p) => _confirmSoftDelete(context, p),
+                      onHardDelete: (p) => _confirmHardDelete(context, p),
                     )
                   : EntityTable<Product>(
                       items: notifier.result.items,
@@ -196,13 +362,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           .read<ProductListNotifier>()
                           .toggleSelection(id),
                       isDeleted: (p) => p.isDeleted,
-                      sortField: notifier.query.sortField,
-                      sortAscending: notifier.query.sortAscending,
+                      sortField: q.sortField,
+                      sortAscending: q.sortAscending,
                       onSort: (field) => _apply(
-                        notifier.query.copyWith(
+                        q.copyWith(
                           sortField: field,
-                          sortAscending: field == notifier.query.sortField
-                              ? !notifier.query.sortAscending
+                          sortAscending: field == q.sortField
+                              ? !q.sortAscending
                               : true,
                         ),
                       ),
@@ -210,7 +376,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         TableColumnSpec(
                           label: 'Название',
                           sortField: 'name',
-                          build: (p) => tableCellText(p.name),
+                          build: (p) => Text(
+                            p.name,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                            style: p.isDeleted
+                                ? const TextStyle(
+                                    decoration: TextDecoration.lineThrough,
+                                  )
+                                : null,
+                          ),
                         ),
                         TableColumnSpec(
                           label: 'Артикул',
@@ -218,32 +393,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           build: (p) => tableCellText(p.sku),
                         ),
                         TableColumnSpec(
-                          label: 'Категории',
-                          build: (p) => tableCellText(categoriesLabel(p)),
-                        ),
-                        TableColumnSpec(
-                          label: 'Бренды',
-                          build: (p) => tableCellText(brandsLabel(p)),
-                        ),
-                        TableColumnSpec(
-                          label: 'Поставщик',
-                          build: (p) =>
-                              tableCellText(supplierNames[p.supplierId] ?? '—'),
-                        ),
-                        TableColumnSpec(
-                          label: 'Год',
-                          sortField: 'year',
-                          numeric: true,
-                          build: (p) => Text('${p.year}'),
-                        ),
-                        TableColumnSpec(
                           label: 'Цена',
                           sortField: 'price',
                           numeric: true,
                           build: (p) => Text(formatPrice(p.price)),
                         ),
+                        TableColumnSpec(
+                          label: 'Бренд',
+                          build: (p) => tableCellText(
+                            p.brandName.isEmpty ? '—' : p.brandName,
+                          ),
+                        ),
+                        TableColumnSpec(
+                          label: 'Категория',
+                          build: (p) => tableCellText(
+                            p.categoryName.isEmpty ? '—' : p.categoryName,
+                          ),
+                        ),
                       ],
-                      actions: (p) => _productActions(context, p),
+                      actions: (p) => _actions(context, p),
                     ),
             ),
           ),
@@ -253,27 +421,26 @@ class _ProductListScreenState extends State<ProductListScreen> {
               page: notifier.result.page,
               totalPages: notifier.result.totalPages,
               total: notifier.result.total,
-              size: notifier.query.size,
-              onPageChanged: (page) =>
-                  _apply(notifier.query.copyWith(page: page)),
-              onSizeChanged: (size) =>
-                  _apply(notifier.query.copyWith(size: size, page: 1)),
+              size: q.size,
+              onPageChanged: (page) => _apply(q.copyWith(page: page)),
+              onSizeChanged: (size) => _apply(q.copyWith(size: size, page: 1)),
             ),
         ],
       ),
     );
   }
 
-  List<Widget> _productActions(BuildContext context, Product product) {
-    final n = context.read<ProductListNotifier>();
+  List<Widget> _actions(BuildContext context, Product product) {
     final auth = context.watch<AuthNotifier>();
+
     if (product.isDeleted) {
       return [
         if (auth.canRestore)
           IconButton(
             tooltip: 'Восстановить',
             icon: const Icon(Icons.restore),
-            onPressed: () => n.restore(product.id),
+            onPressed: () =>
+                context.read<ProductListNotifier>().restore(product.id),
           ),
         if (auth.canHardDelete)
           IconButton(
@@ -311,60 +478,53 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Future<void> _confirmSoftDelete(BuildContext context, Product product) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Логическое удаление'),
-        content: Text('Скрыть товар «${product.name}» из каталога?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
+    final ok = await _confirm(
+      context,
+      title: 'Логическое удаление',
+      message: 'Скрыть товар «${product.name}» из каталога?',
+      action: 'Удалить',
     );
-    if (ok == true && context.mounted) {
+    if (ok && context.mounted) {
       await context.read<ProductListNotifier>().softDelete(product.id);
     }
   }
 
   Future<void> _confirmHardDelete(BuildContext context, Product product) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Физическое удаление'),
-        content: Text('Стереть товар «${product.name}» навсегда?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Стереть'),
-          ),
-        ],
-      ),
+    final ok = await _confirm(
+      context,
+      title: 'Физическое удаление',
+      message: 'Стереть товар «${product.name}» навсегда?',
+      action: 'Стереть',
     );
-    if (ok == true && context.mounted) {
+    if (ok && context.mounted) {
       await context.read<ProductListNotifier>().hardDelete(product.id);
     }
   }
 
   Future<void> _confirmDeleteSelected(BuildContext context) async {
     final notifier = context.read<ProductListNotifier>();
+    final ok = await _confirm(
+      context,
+      title: 'Удалить выбранные',
+      message: 'Логически удалить ${notifier.selected.length} товар(ов)?',
+      action: 'Удалить',
+    );
+    if (ok && context.mounted) {
+      await notifier.deleteSelected();
+    }
+  }
+
+  Future<bool> _confirm(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String action,
+  }) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить выбранные'),
-        content: Text(
-          'Логически удалить ${notifier.selected.length} товар(ов)?',
-        ),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -372,264 +532,105 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
+            child: Text(action),
           ),
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await context.read<ProductListNotifier>().deleteSelected();
-    }
-  }
-}
-
-class _ProductFilters extends StatelessWidget {
-  const _ProductFilters({
-    required this.notifier,
-    required this.brands,
-    required this.categories,
-    required this.suppliers,
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onApply,
-  });
-
-  final ProductListNotifier notifier;
-  final List<Brand> brands;
-  final List<Category> categories;
-  final List<Supplier> suppliers;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
-  final Future<void> Function(ProductQuery next) onApply;
-
-  @override
-  Widget build(BuildContext context) {
-    final q = notifier.query;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 240,
-            child: TextField(
-              key: const Key('product-search'),
-              controller: searchController,
-              decoration: const InputDecoration(
-                labelText: 'Поиск: название или артикул',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onChanged: onSearchChanged,
-            ),
-          ),
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<int?>(
-              isExpanded: true,
-              // ignore: deprecated_member_use
-              value: q.categoryId,
-              decoration: const InputDecoration(
-                labelText: 'Категория',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Все')),
-                for (final c in categories)
-                  DropdownMenuItem(
-                    value: c.id,
-                    child: Text(c.name, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (value) => onApply(q.copyWith(categoryId: value)),
-            ),
-          ),
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<int?>(
-              isExpanded: true,
-              // ignore: deprecated_member_use
-              value: q.brandId,
-              decoration: const InputDecoration(
-                labelText: 'Бренд',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Все')),
-                for (final b in brands)
-                  DropdownMenuItem(
-                    value: b.id,
-                    child: Text(b.name, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (value) => onApply(q.copyWith(brandId: value)),
-            ),
-          ),
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<int?>(
-              isExpanded: true,
-              // ignore: deprecated_member_use
-              value: q.supplierId,
-              decoration: const InputDecoration(
-                labelText: 'Поставщик',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Все')),
-                for (final s in suppliers)
-                  DropdownMenuItem(
-                    value: s.id,
-                    child: Text(s.name, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (value) => onApply(q.copyWith(supplierId: value)),
-            ),
-          ),
-          SizedBox(
-            width: 110,
-            child: TextFormField(
-              key: ValueKey('yearFrom-${q.yearFrom}'),
-              initialValue: q.yearFrom?.toString() ?? '',
-              decoration: const InputDecoration(
-                labelText: 'Год от',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (value) => onApply(
-                q.copyWith(
-                  yearFrom: value.isEmpty ? null : int.tryParse(value),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 110,
-            child: TextFormField(
-              key: ValueKey('yearTo-${q.yearTo}'),
-              initialValue: q.yearTo?.toString() ?? '',
-              decoration: const InputDecoration(
-                labelText: 'Год до',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (value) => onApply(
-                q.copyWith(yearTo: value.isEmpty ? null : int.tryParse(value)),
-              ),
-            ),
-          ),
-          FilterChip(
-            label: const Text('Показать удалённые'),
-            selected: q.includeDeleted,
-            onSelected: (value) => onApply(q.copyWith(includeDeleted: value)),
-          ),
-        ],
-      ),
-    );
+    return ok == true;
   }
 }
 
 class _ProductCards extends StatelessWidget {
   const _ProductCards({
     required this.items,
-    required this.brandNames,
-    required this.categoryNames,
     required this.selected,
+    required this.onSoftDelete,
+    required this.onHardDelete,
   });
 
   final List<Product> items;
-  final Map<int, String> brandNames;
-  final Map<int, String> categoryNames;
-  final Set<int> selected;
+  final Set<String> selected;
+  final Future<void> Function(Product product) onSoftDelete;
+  final Future<void> Function(Product product) onHardDelete;
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.read<ProductListNotifier>();
     final auth = context.watch<AuthNotifier>();
+
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final p = items[index];
-        final brands = p.brandIds
-            .map((id) => brandNames[id] ?? '#$id')
-            .join(', ');
-        final cats = p.categoryIds
-            .map((id) => categoryNames[id] ?? '#$id')
-            .join(', ');
+        final reference = [
+          if (p.brandName.isNotEmpty) p.brandName,
+          if (p.categoryName.isNotEmpty) p.categoryName,
+        ].join(' · ');
         return Card(
+          margin: const EdgeInsets.only(bottom: 6),
           color: p.isDeleted
               ? Theme.of(context).colorScheme.errorContainer
                     .withValues(alpha: 0.35)
               : null,
           child: ListTile(
-            leading: auth.canEditCatalog
-                ? Checkbox(
-                    value: selected.contains(p.id),
-                    onChanged: (_) => notifier.toggleSelection(p.id),
-                  )
-                : null,
-            title: Text(p.name),
+            leading: Checkbox(
+              value: selected.contains(p.id),
+              onChanged: (_) => notifier.toggleSelection(p.id),
+            ),
+            title: Text(
+              p.name,
+              style: p.isDeleted
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
             subtitle: Text(
-              '${p.sku} · $cats · $brands · ${p.year}\n'
-              '${formatPrice(p.price)}',
+              '${p.sku} · ${formatPrice(p.price)}\n'
+              '${reference.isEmpty ? 'связи не указаны' : reference}'
+              '${p.isDeleted ? ' · удалён' : ''}',
             ),
             isThreeLine: true,
             onTap: () => context.push('/products/${p.id}'),
-            trailing: !auth.canEditCatalog
-                ? null
-                : PopupMenuButton<String>(
+            trailing: auth.canEditCatalog || auth.canHardDelete
+                ? PopupMenuButton<String>(
                     onSelected: (value) async {
                       switch (value) {
                         case 'edit':
                           context.push('/products/${p.id}/edit');
                         case 'soft':
-                          await notifier.softDelete(p.id);
+                          await onSoftDelete(p);
                         case 'hard':
-                          await notifier.hardDelete(p.id);
+                          await onHardDelete(p);
                         case 'restore':
                           await notifier.restore(p.id);
                       }
                     },
                     itemBuilder: (context) => [
                       if (!p.isDeleted) ...[
+                        if (auth.canEditCatalog) ...[
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Изменить'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'soft',
+                            child: Text('Удалить логически'),
+                          ),
+                        ],
+                      ] else if (auth.canRestore)
                         const PopupMenuItem(
-                          value: 'edit',
-                          child: Text('Изменить'),
+                          value: 'restore',
+                          child: Text('Восстановить'),
                         ),
+                      if (auth.canHardDelete)
                         const PopupMenuItem(
-                          value: 'soft',
-                          child: Text('Удалить логически'),
+                          value: 'hard',
+                          child: Text('Удалить навсегда'),
                         ),
-                        if (auth.canHardDelete)
-                          const PopupMenuItem(
-                            value: 'hard',
-                            child: Text('Удалить навсегда'),
-                          ),
-                      ] else ...[
-                        if (auth.canRestore)
-                          const PopupMenuItem(
-                            value: 'restore',
-                            child: Text('Восстановить'),
-                          ),
-                        if (auth.canHardDelete)
-                          const PopupMenuItem(
-                            value: 'hard',
-                            child: Text('Удалить навсегда'),
-                          ),
-                      ],
                     ],
-                  ),
+                  )
+                : null,
           ),
         );
       },

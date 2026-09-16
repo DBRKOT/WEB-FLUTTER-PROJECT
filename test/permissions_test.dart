@@ -15,59 +15,92 @@ void main() {
     final auth = AuthNotifier(prefs, Dio());
     auth.seedForTest(
       AppUser(
-        id: 1,
-        username: 'u',
-        fullName: 'User',
-        email: 'u@test',
+        id: 'usr0000000000001',
+        fullName: 'Пользователь',
+        email: 'u@tm.local',
         role: role,
-        readerId: role == UserRole.reader ? 1 : null,
       ),
     );
     return auth;
   }
 
-  test('клиент видит только каталог и свои заказы', () async {
-    final auth = await make(UserRole.reader);
+  test('клиент видит каталог, свои заказы и свои заявки', () async {
+    final auth = await make(UserRole.client);
     expect(auth.canEditCatalog, isFalse);
     expect(auth.canViewMyOrders, isTrue);
+    expect(auth.canViewMyRepairs, isTrue);
     expect(auth.canManageOrders, isFalse);
     expect(auth.canManageUsers, isFalse);
+    expect(auth.canManageService, isFalse);
     expect(auth.canOpenPath('/products'), isTrue);
-    expect(auth.canOpenPath('/products/1'), isTrue);
+    expect(auth.canOpenPath('/products/abc123'), isTrue);
     expect(auth.canOpenPath('/products/new'), isFalse);
     expect(auth.canOpenPath('/my-orders'), isTrue);
+    expect(auth.canOpenPath('/my-repairs'), isTrue);
     expect(auth.canOpenPath('/orders'), isFalse);
+    expect(auth.canOpenPath('/repairs'), isFalse);
     expect(auth.canOpenPath('/admin/users'), isFalse);
+    expect(auth.canOpenPath('/stock'), isFalse);
     expect(auth.canOpenPath('/brands'), isFalse);
   });
 
-  test('менеджер редактирует каталог и заказы, без админки', () async {
-    final auth = await make(UserRole.librarian);
+  test('менеджер владеет сервисным центром, но не админкой', () async {
+    final auth = await make(UserRole.manager);
     expect(auth.canEditCatalog, isTrue);
+    expect(auth.canManageService, isTrue);
     expect(auth.canHardDelete, isFalse);
+    expect(auth.canManageStock, isFalse);
     expect(auth.canViewMyOrders, isFalse);
     expect(auth.canManageOrders, isTrue);
     expect(auth.canManageUsers, isFalse);
     expect(auth.canOpenPath('/orders'), isTrue);
     expect(auth.canOpenPath('/products/new'), isTrue);
-    expect(auth.canOpenPath('/customers'), isTrue);
+    expect(auth.canOpenPath('/repairs'), isTrue);
+    expect(auth.canOpenPath('/masters'), isTrue);
     expect(auth.canOpenPath('/admin/stats'), isFalse);
+    expect(auth.canOpenPath('/stock'), isFalse);
     expect(auth.canOpenPath('/my-orders'), isFalse);
   });
 
-  test('админ: hard delete, пользователи и статистика', () async {
-    final auth = await make(UserRole.admin);
-    expect(auth.canHardDelete, isTrue);
-    expect(auth.canRestore, isTrue);
-    expect(auth.canManageUsers, isTrue);
-    expect(auth.canViewStats, isTrue);
-    expect(auth.canEditCatalog, isTrue);
-    expect(auth.canOpenPath('/admin/users'), isTrue);
-    expect(auth.canOpenPath('/admin/stats'), isTrue);
+  test(
+    'администратор владеет пользователями и складом, но не сервисом',
+    () async {
+      final auth = await make(UserRole.admin);
+      expect(auth.canHardDelete, isTrue);
+      expect(auth.canRestore, isTrue);
+      expect(auth.canManageUsers, isTrue);
+      expect(auth.canManageStock, isTrue);
+      expect(auth.canViewStats, isTrue);
+      expect(auth.canEditCatalog, isTrue);
+      expect(auth.canOpenPath('/admin/users'), isTrue);
+      expect(auth.canOpenPath('/admin/stats'), isTrue);
+      expect(auth.canOpenPath('/stock'), isTrue);
+
+      expect(auth.canManageService, isFalse);
+      expect(auth.canOpenPath('/repairs'), isFalse);
+    },
+  );
+
+  test('у каждой роли есть исключительный раздел', () async {
+    final client = await make(UserRole.client);
+    final manager = await make(UserRole.manager);
+    final admin = await make(UserRole.admin);
+
+    expect(client.canOpenPath('/my-repairs'), isTrue);
+    expect(manager.canOpenPath('/my-repairs'), isFalse);
+    expect(admin.canOpenPath('/my-repairs'), isFalse);
+
+    expect(manager.canOpenPath('/repairs'), isTrue);
+    expect(client.canOpenPath('/repairs'), isFalse);
+    expect(admin.canOpenPath('/repairs'), isFalse);
+
+    expect(admin.canOpenPath('/admin/users'), isTrue);
+    expect(client.canOpenPath('/admin/users'), isFalse);
+    expect(manager.canOpenPath('/admin/users'), isFalse);
   });
 
-  test('подмена UI-роли открывает админ-пути на клиенте', () async {
-    final auth = await make(UserRole.reader);
+  test('подмена роли в интерфейсе не меняет токен', () async {
+    final auth = await make(UserRole.client);
     expect(auth.canOpenPath('/admin/users'), isFalse);
     await auth.spoofUiRole(UserRole.admin);
     expect(auth.user?.role, UserRole.admin);
@@ -77,15 +110,14 @@ void main() {
   });
 
   test('reloadUserFromLocalStorage читает подменённую роль', () async {
-    final auth = await make(UserRole.reader);
+    final auth = await make(UserRole.client);
     await auth.spoofUiRole(UserRole.admin);
     auth.seedForTest(
       const AppUser(
-        id: 1,
-        username: 'u',
-        fullName: 'User',
-        email: 'u@test',
-        role: UserRole.reader,
+        id: 'usr0000000000001',
+        fullName: 'Пользователь',
+        email: 'u@tm.local',
+        role: UserRole.client,
       ),
     );
     final ok = await auth.reloadUserFromLocalStorage();
@@ -93,14 +125,14 @@ void main() {
     expect(auth.user?.role, UserRole.admin);
   });
 
-  test('иерархия has(): админ включает права менеджера', () async {
+  test('has(): администратор включает права менеджера', () async {
     final auth = await make(UserRole.admin);
-    expect(auth.has(UserRole.reader), isTrue);
-    expect(auth.has(UserRole.librarian), isTrue);
+    expect(auth.has(UserRole.client), isTrue);
+    expect(auth.has(UserRole.manager), isTrue);
     expect(auth.has(UserRole.admin), isTrue);
 
-    final client = await make(UserRole.reader);
-    expect(client.has(UserRole.librarian), isFalse);
+    final client = await make(UserRole.client);
+    expect(client.has(UserRole.manager), isFalse);
     expect(client.has(UserRole.admin), isFalse);
   });
 }

@@ -4,15 +4,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tech_store/core/auth_notifier.dart';
-import 'package:tech_store/core/reference_cache.dart';
 import 'package:tech_store/main.dart';
 import 'package:tech_store/models/app_user.dart';
-import 'package:tech_store/repositories/api_loan_service.dart';
-import 'package:tech_store/repositories/persistent_brand_repository.dart';
-import 'package:tech_store/repositories/persistent_category_repository.dart';
-import 'package:tech_store/repositories/persistent_customer_repository.dart';
-import 'package:tech_store/repositories/persistent_product_repository.dart';
-import 'package:tech_store/repositories/persistent_supplier_repository.dart';
+
+import 'support/fake_pb_server.dart';
+
+Future<ResponseBody> _handle(RequestOptions options) async {
+  final path = options.path;
+  if (path.contains('/collections/products/records')) {
+    return jsonBody(pbPage([pbProduct()], totalItems: 1));
+  }
+  if (path.contains('/collections/brands/records')) {
+    return jsonBody(
+      pbPage([
+        {
+          'id': 'brn0000000000001',
+          'name': 'Samsung',
+          'country': 'Республика Корея',
+          'foundedYear': 1938,
+        },
+      ], totalItems: 1),
+    );
+  }
+  if (path.contains('/collections/categories/records')) {
+    return jsonBody(
+      pbPage([
+        {'id': 'cat0000000000001', 'name': 'Смартфоны'},
+      ], totalItems: 1),
+    );
+  }
+  return jsonBody(pbPage([]));
+}
 
 Future<void> _bindView(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1280, 800);
@@ -23,6 +45,7 @@ Future<void> _bindView(WidgetTester tester) async {
 Future<void> _waitForLoad(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -31,81 +54,37 @@ void main() {
   testWidgets('каталог загружает товары после входа', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    final products = PersistentProductRepository(prefs);
-    final brands = PersistentBrandRepository(prefs);
-    final categories = PersistentCategoryRepository(prefs);
-    final suppliers = PersistentSupplierRepository(prefs, products);
-    final dio = Dio();
+    final dio = fakeDio(FakePbAdapter(_handle));
     final auth = AuthNotifier(prefs, dio);
     auth.seedForTest(
       const AppUser(
-        id: 1,
-        username: 'admin',
-        fullName: 'Администратор ТехноМаркет',
-        email: 'admin@technomarket.local',
+        id: 'usr0000000000001',
+        fullName: 'Соколова Ольга Павловна',
+        email: 'admin@tm.local',
         role: UserRole.admin,
       ),
     );
-    final cache = ReferenceCache(
-      brands: brands,
-      categories: categories,
-      suppliers: suppliers,
-    );
 
     await _bindView(tester);
-    await tester.pumpWidget(
-      TechStoreApp(
-        prefs: prefs,
-        dio: dio,
-        auth: auth,
-        products: products,
-        brands: brands,
-        categories: categories,
-        suppliers: suppliers,
-        customers: PersistentCustomerRepository(prefs),
-        loans: ApiLoanService(dio),
-        referenceCache: cache,
-      ),
-    );
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pumpWidget(TechStoreApp(dio: dio, auth: auth));
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
 
     await _waitForLoad(tester);
 
-    expect(find.text('Каталог товаров'), findsOneWidget);
-    expect(find.text('AirPods Pro 2'), findsOneWidget);
-    expect(find.textContaining('Администратор ТехноМаркет'), findsOneWidget);
+    expect(find.textContaining('Samsung Galaxy S24'), findsWidgets);
+    expect(find.textContaining('Соколова Ольга Павловна'), findsOneWidget);
   });
 
-  testWidgets('без входа открывается экран логина', (tester) async {
+  testWidgets('без входа открывается экран входа', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    final products = PersistentProductRepository(prefs);
-    final brands = PersistentBrandRepository(prefs);
-    final categories = PersistentCategoryRepository(prefs);
-    final suppliers = PersistentSupplierRepository(prefs, products);
-    final dio = Dio();
-    final cache = ReferenceCache(
-      brands: brands,
-      categories: categories,
-      suppliers: suppliers,
-    );
+    final dio = fakeDio(FakePbAdapter(_handle));
 
     await _bindView(tester);
     await tester.pumpWidget(
-      TechStoreApp(
-        prefs: prefs,
-        dio: dio,
-        auth: AuthNotifier(prefs, dio),
-        products: products,
-        brands: brands,
-        categories: categories,
-        suppliers: suppliers,
-        customers: PersistentCustomerRepository(prefs),
-        loans: ApiLoanService(dio),
-        referenceCache: cache,
-      ),
+      TechStoreApp(dio: dio, auth: AuthNotifier(prefs, dio)),
     );
-    await tester.pumpAndSettle();
+    await _waitForLoad(tester);
 
     expect(find.text('Вход в систему'), findsOneWidget);
     expect(find.text('Войти'), findsOneWidget);

@@ -2,22 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/auth_notifier.dart';
+import '../core/form_api_errors.dart';
+import '../core/permissions.dart';
 import '../models/customer.dart';
-import '../state/customer_list_notifier.dart';
+import '../models/order_query.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
 import '../widgets/load_state_view.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   const CustomerDetailScreen({super.key, required this.customerId});
 
-  final int customerId;
+  final String customerId;
 
   @override
   State<CustomerDetailScreen> createState() => _CustomerDetailScreenState();
 }
 
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
-  LoadStatus _status = LoadStatus.loading;
+  LoadStatus _status = LoadStatus.idle;
   String? _error;
   Customer? _customer;
 
@@ -46,98 +50,147 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Не удалось загрузить клиента: $e';
+        _error = apiErrorMessage(e);
         _status = LoadStatus.error;
       });
     }
   }
 
+  Future<void> _confirmDelete(Customer customer) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удаление профиля'),
+        content: Text(
+          'Удалить профиль клиента «${customer.displayName}»? '
+          'Профиль будет стёрт безвозвратно, учётная запись останется.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await context.read<CustomerListNotifier>().hardDelete(customer.id);
+    if (mounted) context.go('/customers');
+  }
+
+  String _formatDay(DateTime? value) {
+    if (value == null) return 'не указана';
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    return '$day.$month.${value.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthNotifier>();
+    final customer = _customer;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_customer?.fullName ?? 'Клиент'),
+        title: const Text('Клиент'),
         leading: IconButton(
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/customers');
-            }
-          },
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/customers'),
         ),
         actions: [
-          if (_customer != null && !_customer!.isDeleted)
+          if (customer != null && auth.canEditCatalog)
             IconButton(
               tooltip: 'Изменить',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () => context.push('/customers/${_customer!.id}/edit'),
+              onPressed: () => context.push('/customers/${customer.id}/edit'),
+            ),
+          if (customer != null && auth.canHardDelete)
+            IconButton(
+              tooltip: 'Удалить',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _confirmDelete(customer),
             ),
         ],
       ),
       body: LoadStateView(
         status: _status,
         error: _error,
-        isEmpty: _customer == null,
-        emptyMessage: 'Клиент не найден',
+        isEmpty: _status == LoadStatus.success && customer == null,
+        emptyMessage: 'Профиль клиента не найден',
         onRetry: _load,
-        child: _customer == null
+        child: customer == null
             ? const SizedBox.shrink()
-            : Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      ListTile(
-                        dense: true,
-                        title: const Text('ФИО'),
-                        subtitle: Text(_customer!.fullName),
-                      ),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Email'),
-                        subtitle: Text(_customer!.email),
-                      ),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Телефон'),
-                        subtitle: Text(
-                          _customer!.phone.isEmpty ? '—' : _customer!.phone,
-                        ),
-                      ),
-                      const Divider(),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Клубная карта'),
-                        subtitle: Text(_customer!.card.number),
-                      ),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Уровень'),
-                        subtitle: Text(_customer!.card.level),
-                      ),
-                      ListTile(
-                        dense: true,
-                        title: const Text('Год выдачи'),
-                        subtitle: Text('${_customer!.card.issuedYear}'),
-                      ),
-                      if (_customer!.isDeleted)
-                        ListTile(
-                          dense: true,
-                          title: const Text('Статус'),
-                          subtitle: const Text('Удалён'),
-                          leading: Icon(
-                            Icons.delete_outline,
-                            color: Theme.of(context).colorScheme.error,
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            customer.displayName,
+                            style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                        ),
-                    ],
+                          const SizedBox(height: 12),
+                          _row(context, 'Почта', customer.email),
+                          _row(
+                            context,
+                            'Телефон',
+                            customer.phone.isEmpty
+                                ? 'не указан'
+                                : customer.phone,
+                          ),
+                          _row(
+                            context,
+                            'Адрес',
+                            customer.address.isEmpty
+                                ? 'не указан'
+                                : customer.address,
+                          ),
+                          _row(
+                            context,
+                            'Дата рождения',
+                            _formatDay(customer.birthDate),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  if (auth.canManageOrders)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.assignment_outlined),
+                      label: const Text('Заказы этого клиента'),
+                      onPressed: () => context.go(
+                        OrderQuery(clientId: customer.userId).toLocation(),
+                      ),
+                    ),
+                ],
               ),
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+          ),
+          Expanded(child: Text(value)),
+        ],
       ),
     );
   }

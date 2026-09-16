@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-class IdChipFormField extends FormField<List<int>> {
+class IdChipFormField extends FormField<List<String>> {
   IdChipFormField({
     super.key,
     required String label,
-    required List<({int id, String name})> options,
-    List<int>? initialValue,
+    required List<({String id, String name})> options,
+    List<String>? initialValue,
     required String emptyError,
     super.onSaved,
-    ValueChanged<List<int>>? onChanged,
+    ValueChanged<List<String>>? onChanged,
   }) : super(
          initialValue: initialValue ?? const [],
          validator: (value) =>

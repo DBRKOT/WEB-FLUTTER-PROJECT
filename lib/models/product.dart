@@ -1,128 +1,92 @@
+import '../repositories/pb_collection_client.dart';
+
 class Product {
-  final int id;
+  final String id;
   final String name;
   final String sku;
-  final int year;
   final int price;
-  final int supplierId; // многие к одному
-  final List<int> brandIds; // многие ко многим
-  final List<int> categoryIds; // многие ко многим
-  final int stockTotal;
-  final int stockAvailable;
-  final DateTime? deletedAt;
+  final int warrantyMonths;
+  final String brandId;
+  final String categoryId;
+  final String supplierId;
+  final String description;
+  final bool archived;
+
+  final String brandName;
+  final String categoryName;
+  final String supplierName;
 
   const Product({
     required this.id,
     required this.name,
     required this.sku,
-    required this.year,
     required this.price,
-    required this.supplierId,
-    required this.brandIds,
-    required this.categoryIds,
-    required this.stockTotal,
-    required this.stockAvailable,
-    this.deletedAt,
+    this.warrantyMonths = 0,
+    required this.brandId,
+    required this.categoryId,
+    this.supplierId = '',
+    this.description = '',
+    this.archived = false,
+    this.brandName = '',
+    this.categoryName = '',
+    this.supplierName = '',
   });
 
-  bool get isDeleted => deletedAt != null;
-
-  int get brandId => brandIds.isEmpty ? 0 : brandIds.first;
+  bool get isDeleted => archived;
 
   Product copyWith({
     String? name,
     String? sku,
-    int? year,
     int? price,
-    int? supplierId,
-    List<int>? brandIds,
-    List<int>? categoryIds,
-    int? stockTotal,
-    int? stockAvailable,
-    DateTime? deletedAt,
-    bool clearDeletedAt = false,
+    int? warrantyMonths,
+    String? brandId,
+    String? categoryId,
+    String? supplierId,
+    String? description,
+    bool? archived,
   }) {
     return Product(
       id: id,
       name: name ?? this.name,
       sku: sku ?? this.sku,
-      year: year ?? this.year,
       price: price ?? this.price,
+      warrantyMonths: warrantyMonths ?? this.warrantyMonths,
+      brandId: brandId ?? this.brandId,
+      categoryId: categoryId ?? this.categoryId,
       supplierId: supplierId ?? this.supplierId,
-      brandIds: brandIds ?? this.brandIds,
-      categoryIds: categoryIds ?? this.categoryIds,
-      stockTotal: stockTotal ?? this.stockTotal,
-      stockAvailable: stockAvailable ?? this.stockAvailable,
-      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+      description: description ?? this.description,
+      archived: archived ?? this.archived,
+      brandName: brandName,
+      categoryName: categoryName,
+      supplierName: supplierName,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
+    'title': name,
     'sku': sku,
-    'year': year,
     'price': price,
-    'supplierId': supplierId,
-    'brandIds': brandIds,
-    'categoryIds': categoryIds,
-    'stockTotal': stockTotal,
-    'stockAvailable': stockAvailable,
-    'deletedAt': deletedAt?.toIso8601String(),
+    'warrantyMonths': warrantyMonths,
+    'brand': brandId,
+    'category': categoryId,
+    if (supplierId.isNotEmpty) 'supplier': supplierId,
+    'description': description,
+    'archived': archived,
   };
 
-  factory Product.fromJson(Map<String, dynamic> json) {
-    final brandIds = <int>[
-      ..._idList(json['brandIds']),
-      ..._nestedIds(json['authors']),
-    ];
-    if (json['brandId'] is int && (json['brandId'] as int) > 0) {
-      brandIds.add(json['brandId'] as int);
-    }
-
-    final categoryIds = <int>[
-      ..._idList(json['categoryIds']),
-      ..._nestedIds(json['genres']),
-    ];
-
-    final publisher = json['publisher'];
-    final supplierId =
-        json['supplierId'] as int? ??
-        json['publisherId'] as int? ??
-        (publisher is Map ? publisher['id'] as int? : null) ??
-        1;
-
-    return Product(
-      id: json['id'] as int? ?? 0,
-      name: (json['name'] ?? json['title'] ?? '') as String,
-      sku: (json['sku'] ?? json['isbn'] ?? '') as String,
-      year: json['year'] as int? ?? 0,
-      price: json['price'] as int? ?? json['pages'] as int? ?? 0,
-      supplierId: supplierId,
-      brandIds: brandIds.toSet().toList(),
-      categoryIds: categoryIds.toSet().toList(),
-      stockTotal:
-          json['stockTotal'] as int? ?? json['copiesTotal'] as int? ?? 0,
-      stockAvailable:
-          json['stockAvailable'] as int? ??
-          json['copiesAvailable'] as int? ??
-          0,
-      deletedAt: json['deletedAt'] == null
-          ? null
-          : DateTime.tryParse(json['deletedAt'] as String),
-    );
-  }
-
-  static List<int> _idList(dynamic value) {
-    if (value is! List) return const [];
-    return value.whereType<int>().toList();
-  }
-
-  static List<int> _nestedIds(dynamic value) {
-    if (value is! List) return const [];
-    return [
-      for (final item in value)
-        if (item is Map && item['id'] is int) item['id'] as int,
-    ];
-  }
+  factory Product.fromJson(Map<String, dynamic> json) => Product(
+    id: json['id'] as String? ?? '',
+    name: json['title'] as String? ?? '',
+    sku: json['sku'] as String? ?? '',
+    price: (json['price'] as num?)?.round() ?? 0,
+    warrantyMonths: (json['warrantyMonths'] as num?)?.toInt() ?? 0,
+    brandId: json['brand'] as String? ?? '',
+    categoryId: json['category'] as String? ?? '',
+    supplierId: json['supplier'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    archived: json['archived'] as bool? ?? false,
+    brandName: pbExpanded(json, 'brand')?['name'] as String? ?? '',
+    categoryName: pbExpanded(json, 'category')?['name'] as String? ?? '',
+    supplierName: pbExpanded(json, 'supplier')?['name'] as String? ?? '',
+  );
 }

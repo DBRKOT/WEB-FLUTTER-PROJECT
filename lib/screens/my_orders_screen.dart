@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api_exceptions.dart';
 import '../core/auth_notifier.dart';
-import '../core/breakpoints.dart';
+import '../core/format.dart';
 import '../core/permissions.dart';
-import '../models/loan_order.dart';
-import '../repositories/api_loan_service.dart';
-import '../state/load_status.dart';
+import '../models/order_query.dart';
+import '../state/entity_notifiers.dart';
 import '../widgets/load_state_view.dart';
-
-String _fmtDate(DateTime d) {
-  final local = d.toLocal();
-  final dd = local.day.toString().padLeft(2, '0');
-  final mm = local.month.toString().padLeft(2, '0');
-  return '$dd.$mm.${local.year}';
-}
+import 'orders_screen.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -25,119 +18,63 @@ class MyOrdersScreen extends StatefulWidget {
 }
 
 class _MyOrdersScreenState extends State<MyOrdersScreen> {
-  LoadStatus _status = LoadStatus.idle;
-  String? _error;
-  List<LoanOrder> _items = [];
-
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _status = LoadStatus.loading;
-      _error = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
     });
-    try {
-      final page = await context.read<ApiLoanService>().findOrders();
-      if (!mounted) return;
-      setState(() {
-        _items = page.items;
-        _status = LoadStatus.success;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _status = LoadStatus.error;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _status = LoadStatus.error;
-      });
-    }
   }
 
-  Future<void> _extend(LoanOrder order) async {
-    try {
-      await context.read<ApiLoanService>().extendLoan(order.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Срок заказа продлён на 14 дней')),
-      );
-      await _load();
-    } on ForbiddenException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('403: ${e.message}')));
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    }
+  Future<void> _reload() async {
+    final clientId = context.read<AuthNotifier>().user?.id;
+    await context.read<OrderListNotifier>().applyQuery(
+      OrderQuery(clientId: clientId),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthNotifier>();
     if (!auth.canViewMyOrders) {
-      return const Center(child: Text('Раздел только для клиентов'));
+      return const Scaffold(
+        body: Center(child: Text('Раздел только для клиентов')),
+      );
     }
+
+    final notifier = context.watch<OrderListNotifier>();
+    final orders = notifier.result.items;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Мои заказы')),
+      floatingActionButton: FloatingActionButton.extended(
+        tooltip: 'Оформить заказ',
+        onPressed: () => context.push('/orders/new'),
+        icon: const Icon(Icons.add_shopping_cart),
+        label: const Text('Оформить заказ'),
+      ),
       body: LoadStateView(
-        status: _status,
-        error: _error,
-        isEmpty: _items.isEmpty,
+        status: notifier.status,
+        error: notifier.error,
+        isEmpty: orders.isEmpty,
         emptyMessage: 'У вас пока нет заказов',
-        onRetry: _load,
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: _items.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
-          itemBuilder: (context, i) {
-            final o = _items[i];
-            final compact = screenSizeOf(context) == ScreenSize.compact;
-            if (compact) {
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        o.productName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text('До ${_fmtDate(o.dueAt)} · ${o.status}'),
-                      if (o.isOpen) ...[
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: () => _extend(o),
-                          child: const Text('Продлить'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }
+        onRetry: _reload,
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+          itemCount: orders.length,
+          itemBuilder: (context, index) {
+            final order = orders[index];
             return Card(
+              margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Text(o.productName),
-                subtitle: Text('До ${_fmtDate(o.dueAt)} · ${o.status}'),
-                trailing: o.isOpen
-                    ? TextButton(
-                        onPressed: () => _extend(o),
-                        child: const Text('Продлить'),
-                      )
-                    : null,
+                title: Text('Заказ от ${formatOrderDate(order.createdAt)}'),
+                subtitle: Text(
+                  '${order.status.label} · ${formatPrice(order.total)}'
+                  '${order.comment.isEmpty ? '' : '\n${order.comment}'}',
+                ),
+                isThreeLine: order.comment.isNotEmpty,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/orders/${order.id}'),
               ),
             );
           },

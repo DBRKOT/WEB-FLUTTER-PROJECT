@@ -11,11 +11,23 @@ import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
 import '../screens/customer_list_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/master_form_screen.dart';
+import '../screens/master_list_screen.dart';
 import '../screens/my_orders_screen.dart';
+import '../screens/my_repairs_screen.dart';
+import '../screens/order_detail_screen.dart';
+import '../screens/order_form_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/product_detail_screen.dart';
 import '../screens/product_form_screen.dart';
 import '../screens/product_list_screen.dart';
+import '../screens/repair_detail_screen.dart';
+import '../screens/repair_form_screen.dart';
+import '../screens/repair_list_screen.dart';
+import '../screens/service_form_screen.dart';
+import '../screens/service_list_screen.dart';
+import '../screens/stock_form_screen.dart';
+import '../screens/stock_list_screen.dart';
 import '../screens/supplier_detail_screen.dart';
 import '../screens/supplier_form_screen.dart';
 import '../screens/supplier_list_screen.dart';
@@ -23,7 +35,6 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/deferred_screen.dart';
 import 'auth_notifier.dart';
 import 'permissions.dart';
-
 
 import '../screens/forbidden_screen.dart' deferred as forbidden_lib;
 import '../screens/register_screen.dart' deferred as register_lib;
@@ -116,14 +127,51 @@ GoRouter createAppRouter(AuthNotifier auth) {
             edit: (id) => CustomerFormScreen(id: id),
             detail: (id) => CustomerDetailScreen(customerId: id),
           ),
+
+          _entityRoutes(
+            path: '/stock',
+            list: const StockListScreen(),
+            create: const StockFormScreen(),
+            edit: (id) => StockFormScreen(id: id),
+          ),
+
+          _entityRoutes(
+            path: '/services',
+            list: const ServiceListScreen(),
+            create: const ServiceFormScreen(),
+            edit: (id) => ServiceFormScreen(id: id),
+          ),
+          _entityRoutes(
+            path: '/masters',
+            list: const MasterListScreen(),
+            create: const MasterFormScreen(),
+            edit: (id) => MasterFormScreen(id: id),
+          ),
+          _entityRoutes(
+            path: '/repairs',
+            list: const RepairListScreen(),
+            create: const RepairFormScreen(),
+            edit: (id) => RepairFormScreen(id: id),
+            detail: (id) => RepairDetailScreen(repairId: id),
+          ),
+
+          _entityRoutes(
+            path: '/orders',
+            list: const OrdersScreen(),
+            create: const OrderFormScreen(),
+            edit: (id) => OrderFormScreen(id: id),
+            detail: (id) => OrderDetailScreen(orderId: id),
+          ),
+
           GoRoute(
             path: '/my-orders',
             builder: (context, state) => const MyOrdersScreen(),
           ),
           GoRoute(
-            path: '/orders',
-            builder: (context, state) => const OrdersScreen(),
+            path: '/my-repairs',
+            builder: (context, state) => const MyRepairsScreen(),
           ),
+
           GoRoute(
             path: '/admin/users',
             builder: (context, state) => DeferredScreen(
@@ -148,8 +196,8 @@ GoRoute _entityRoutes({
   required String path,
   required Widget list,
   required Widget create,
-  required Widget Function(int? id) edit,
-  required Widget Function(int id) detail,
+  required Widget Function(String? id) edit,
+  Widget Function(String id)? detail,
 }) {
   return GoRoute(
     path: path,
@@ -158,18 +206,13 @@ GoRoute _entityRoutes({
       GoRoute(path: 'new', builder: (context, state) => create),
       GoRoute(
         path: ':id/edit',
-        builder: (context, state) {
-          final id = int.tryParse(state.pathParameters['id'] ?? '');
-          return edit(id);
-        },
+        builder: (context, state) => edit(state.pathParameters['id']),
       ),
-      GoRoute(
-        path: ':id',
-        builder: (context, state) {
-          final id = int.parse(state.pathParameters['id']!);
-          return detail(id);
-        },
-      ),
+      if (detail != null)
+        GoRoute(
+          path: ':id',
+          builder: (context, state) => detail(state.pathParameters['id']!),
+        ),
     ],
   );
 }

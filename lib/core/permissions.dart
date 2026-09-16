@@ -4,28 +4,24 @@ import 'auth_notifier.dart';
 extension AuthPermissions on AuthNotifier {
   UserRole? get role => user?.role;
 
-  bool get isClient => role == UserRole.reader;
-  bool get isManager => role == UserRole.librarian;
+  bool get isClient => role == UserRole.client;
+  bool get isManager => role == UserRole.manager;
   bool get isAdmin => role == UserRole.admin;
 
-  //Менеджер и администратор: CRUD каталога и справочников.
-  bool get canEditCatalog => has(UserRole.librarian);
+  bool get canEditCatalog => has(UserRole.manager);
 
-  //Только администратор: hard delete и restore.
-  bool get canHardDelete => has(UserRole.admin);
-  bool get canRestore => has(UserRole.admin);
+  bool get canHardDelete => isAdmin;
+  bool get canRestore => isAdmin;
 
-  // Клиенты магазина (readers API).
-  bool get canManageCustomers => has(UserRole.librarian);
-
-  //Все выдачи / заказы (оформление и закрытие).
-  bool get canManageOrders => has(UserRole.librarian);
-
-  //Только клиент: свои заказы и продление.
+  bool get canManageOrders => has(UserRole.manager);
   bool get canViewMyOrders => isClient;
 
-  //Только администратор.
+  bool get canViewMyRepairs => isClient;
+
+  bool get canManageService => isManager;
+
   bool get canManageUsers => isAdmin;
+  bool get canManageStock => isAdmin;
   bool get canViewStats => isAdmin;
 
   bool canOpenPath(String path) {
@@ -33,6 +29,12 @@ extension AuthPermissions on AuthNotifier {
     if (!isAuthenticated) return false;
 
     if (path.startsWith('/admin')) return canManageUsers || canViewStats;
+    if (path.startsWith('/stock')) return canManageStock;
+
+    for (final base in ['/services', '/masters', '/repairs']) {
+      if (path.startsWith(base)) return canManageService;
+    }
+    if (path.startsWith('/my-repairs')) return canViewMyRepairs;
     if (path.startsWith('/my-orders')) return canViewMyOrders;
     if (path.startsWith('/orders')) return canManageOrders;
 
@@ -40,7 +42,7 @@ extension AuthPermissions on AuthNotifier {
       if (path.contains('/new') || path.contains('/edit')) {
         return canEditCatalog;
       }
-      return true; // просмотр каталога всем
+      return true;
     }
 
     for (final base in ['/brands', '/categories', '/suppliers', '/customers']) {

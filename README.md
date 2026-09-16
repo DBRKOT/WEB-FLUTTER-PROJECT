@@ -6,13 +6,23 @@
 
 flutter pub get
 
-# Запуск API
+# Запуск сервера (PocketBase)
 
-cd api
-node mock-server.js --port 8080 --origin http://localhost:5555
+cd pb
+.\pocketbase.exe serve --http 127.0.0.1:8090
 
-Если сайт открыт с другого адреса — поменять origin, например:
-node mock-server.js --port 8080 --origin http://127.0.0.1:8001
+Панель: http://127.0.0.1:8090/_/  (admin@techmarket.local / admin12345678)
+REST API: http://127.0.0.1:8090/api/
+
+Схема данных и тестовые записи:
+node setup_schema.js
+node seed_data.js
+
+Проверки сервера:
+node check_rules.js     — разграничение прав по ролям
+node check_session.js   — вход, продление токена, запрет повышения роли
+
+Учебное API из ПР2-ПР6 (api/mock-server.js) в итоговом проекте не используется.
 
 # Запуск веб (разработка)
 
@@ -20,7 +30,10 @@ flutter run -d chrome --web-port=5555
 
 Открыть: http://localhost:5555/
 
-Учётки: admin/admin123, manager/manager123, client/client123
+Вход по адресу почты:
+client@tm.local / client123456
+manager@tm.local / manager123456
+admin@tm.local / admin123456
 
 # Проверки
 
@@ -40,7 +53,7 @@ flutter build web --release
 .\scripts\build_gh_pages.ps1 -ApiBaseUrl "https://5555/api"
 
 Вручную:
-flutter build web --release --base-href /WEB-FLUTTER-PROJECT/ --dart-define=API_BASE_URL=http://localhost:8080/api
+flutter build web --release --base-href /WEB-FLUTTER-PROJECT/ --dart-define=API_BASE_URL=http://127.0.0.1:8090/api
 Copy-Item -Force build\web\index.html build\web\404.html
 
 С --wasm (сравнение):
@@ -75,16 +88,6 @@ https://dbrkot.github.io/WEB-FLUTTER-PROJECT/
 
 Хостинг: GitHub Pages (ветка gh-pages и/или Actions из .github/workflows/deploy-pages.yml).
 
-# Куда заходить в приложении
-
-/login — вход (все)
-/register — регистрация (все)
-/products — каталог (после входа)
-/brands /categories /suppliers /customers — справочники (manager, admin)
-/orders — заказы клиентов (manager, admin)
-/my-orders — свои заказы (client)
-/admin/users /admin/stats — админка (admin)
-/forbidden — нет доступа
 
 # Скрипты
 
@@ -96,4 +99,4 @@ scripts\measure_size.ps1 — замер размера сборки
 
 # Адаптив
 
-F12 далее Ctrl+Shift+M → Responsive → ширины 360, 768, 1280, 1920.
+F12 далее Ctrl+Shift+M далее Responsive далее ширины 360, 768, 1280, 1920.

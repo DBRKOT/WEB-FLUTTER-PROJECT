@@ -15,7 +15,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,7 +25,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
     _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -43,10 +41,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _submitting = true);
     try {
       await context.read<AuthNotifier>().register(
-        username: _usernameController.text,
+        email: _emailController.text,
         password: _passwordController.text,
         fullName: _fullNameController.text,
-        email: _emailController.text,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -58,6 +55,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _fieldErrors = Map<String, String>.from(e.errors);
         _error = e.message;
+      });
+      _formKey.currentState!.validate();
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _fieldErrors = Map<String, String>.from(e.errors);
+        _error = 'Этот адрес почты уже занят.';
       });
       _formKey.currentState!.validate();
     } on ApiException catch (e) {
@@ -116,34 +120,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
-                      controller: _usernameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Логин',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        final api = _fieldErrors['username'];
-                        if (api != null) return api;
-                        return V.combine([
-                          V.required(),
-                          V.length(min: 3, max: 40),
-                        ])(value);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
-                        labelText: 'Email (необязательно)',
+                        labelText: 'Электронная почта',
                         border: OutlineInputBorder(),
+                        helperText: 'Используется как логин',
                       ),
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) {
                         final api = _fieldErrors['email'];
                         if (api != null) return api;
-                        final text = value?.trim() ?? '';
-                        if (text.isEmpty) return null;
-                        return V.email()(text);
+                        return V.combine([V.required(), V.email()])(value);
                       },
                     ),
                     const SizedBox(height: 16),

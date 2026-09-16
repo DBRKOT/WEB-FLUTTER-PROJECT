@@ -1,95 +1,63 @@
-class MembershipCard {
-  final String number;
-  final String level;
-  final int issuedYear;
-
-  const MembershipCard({
-    required this.number,
-    this.level = 'Standard',
-    required this.issuedYear,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'number': number,
-    'level': level,
-    'issuedYear': issuedYear,
-  };
-
-  factory MembershipCard.fromJson(Map<String, dynamic>? json) {
-    if (json == null) {
-      return const MembershipCard(number: '', issuedYear: 2024);
-    }
-    final issuedAt = json['issuedAt'] as String?;
-    final issuedYear =
-        json['issuedYear'] as int? ??
-        (issuedAt != null ? DateTime.tryParse(issuedAt)?.year : null) ??
-        2024;
-    return MembershipCard(
-      number: json['number'] as String? ?? '',
-      level: json['level'] as String? ?? 'Standard',
-      issuedYear: issuedYear,
-    );
-  }
-}
+import '../repositories/pb_collection_client.dart';
 
 class Customer {
-  final int id;
+  final String id;
+  final String userId;
+  final String phone;
+  final String address;
+  final DateTime? birthDate;
+
   final String fullName;
   final String email;
-  final String phone;
-  final MembershipCard card; //один к одному
-  final DateTime? deletedAt;
 
   const Customer({
     required this.id,
-    required this.fullName,
-    required this.email,
+    required this.userId,
     this.phone = '',
-    required this.card,
-    this.deletedAt,
+    this.address = '',
+    this.birthDate,
+    this.fullName = '',
+    this.email = '',
   });
 
-  bool get isDeleted => deletedAt != null;
+  String get displayName => fullName.trim().isEmpty ? email : fullName.trim();
 
   Customer copyWith({
-    String? fullName,
-    String? email,
+    String? userId,
     String? phone,
-    MembershipCard? card,
-    DateTime? deletedAt,
-    bool clearDeletedAt = false,
+    String? address,
+    DateTime? birthDate,
+    bool clearBirthDate = false,
   }) {
     return Customer(
       id: id,
-      fullName: fullName ?? this.fullName,
-      email: email ?? this.email,
+      userId: userId ?? this.userId,
       phone: phone ?? this.phone,
-      card: card ?? this.card,
-      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+      address: address ?? this.address,
+      birthDate: clearBirthDate ? null : (birthDate ?? this.birthDate),
+      fullName: fullName,
+      email: email,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'fullName': fullName,
-    'email': email,
+    'user': userId,
     'phone': phone,
-    'card': card.toJson(),
-    'deletedAt': deletedAt?.toIso8601String(),
+    'address': address,
+    'birthDate': birthDate?.toUtc().toIso8601String() ?? '',
   };
 
-  factory Customer.fromJson(Map<String, dynamic> json) => Customer(
-    id: json['id'] as int? ?? 0,
-    fullName: json['fullName'] as String? ?? '',
-    email: json['email'] as String? ?? '',
-    phone: json['phone'] as String? ?? '',
-    card: MembershipCard.fromJson(
-      json['card'] is Map<String, dynamic>
-          ? json['card'] as Map<String, dynamic>
-          : null,
-    ),
-    deletedAt: json['deletedAt'] == null
-        ? null
-        : DateTime.tryParse(json['deletedAt'] as String),
-  );
+  factory Customer.fromJson(Map<String, dynamic> json) {
+    final user = pbExpanded(json, 'user');
+    final rawBirth = json['birthDate'] as String? ?? '';
+    return Customer(
+      id: json['id'] as String? ?? '',
+      userId: json['user'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      birthDate: rawBirth.isEmpty ? null : DateTime.tryParse(rawBirth),
+      fullName: (user?['fullName'] ?? user?['name'] ?? '') as String,
+      email: user?['email'] as String? ?? '',
+    );
+  }
 }

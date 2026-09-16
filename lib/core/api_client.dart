@@ -5,6 +5,7 @@ import 'api_exceptions.dart';
 import 'auth_notifier.dart';
 import 'config.dart';
 
+
 Dio buildDio({
   String? Function()? tokenProvider,
   AuthNotifier? Function()? authProvider,
@@ -24,14 +25,7 @@ Dio buildDio({
       onRequest: (options, handler) {
         final token = tokenProvider?.call();
         if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-
-        if (apiDebugDelayMs > 0) {
-          options.queryParameters['__delay'] = apiDebugDelayMs;
-        }
-        if (apiDebugFailStatus > 0) {
-          options.queryParameters['__fail'] = apiDebugFailStatus;
+          options.headers['Authorization'] = token;
         }
 
         if (kDebugMode) {
@@ -49,18 +43,18 @@ Dio buildDio({
         final status = response.statusCode ?? 0;
         final opts = response.requestOptions;
         final alreadyRetried = opts.extra['authRetried'] == true;
-        final isAuthCall = opts.path.contains('/auth/');
+        final isAuthCall = opts.path.contains('auth-');
         final auth = authProvider?.call();
 
         if (status == 401 && auth != null && !alreadyRetried && !isAuthCall) {
           try {
             await auth.refreshOrLogin(dio);
             opts.extra['authRetried'] = true;
-            opts.headers['Authorization'] = 'Bearer ${auth.accessToken}';
+            opts.headers['Authorization'] = auth.accessToken;
             final retry = await dio.fetch(opts);
             return handler.resolve(retry);
           } catch (_) {
-            await auth.logout(reason: 'refresh после 401 не удался');
+            await auth.logout(reason: 'обновление токена после 401 не удалось');
           }
         }
 

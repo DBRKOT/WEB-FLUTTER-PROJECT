@@ -23,12 +23,10 @@ void main() {
     final auth = AuthNotifier(prefs, Dio());
     auth.seedForTest(
       AppUser(
-        id: 1,
-        username: 'u',
-        fullName: 'User',
-        email: 'u@test',
+        id: 'usr0000000000001',
+        fullName: 'Пользователь',
+        email: 'u@tm.local',
         role: role,
-        readerId: role == UserRole.reader ? 1 : null,
       ),
     );
     return auth;
@@ -125,7 +123,7 @@ void main() {
   });
 
   testWidgets('у клиента скрыты админ-пункты навигации', (tester) async {
-    final auth = await authWith(UserRole.reader);
+    final auth = await authWith(UserRole.client);
     final router = GoRouter(
       initialLocation: '/products',
       routes: [
@@ -169,7 +167,7 @@ void main() {
     expect(find.text('Бренды'), findsNothing);
   });
 
-  testWidgets('экран входа: пустой логин показывает ошибку валидации', (
+  testWidgets('экран входа: пустая почта показывает ошибку валидации', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -189,7 +187,7 @@ void main() {
     await tester.tap(find.text('Войти'));
     await tester.pump();
 
-    expect(find.text('Введите логин'), findsOneWidget);
+    expect(find.text('Введите адрес почты'), findsOneWidget);
     expect(find.text('Введите пароль'), findsOneWidget);
   });
 }

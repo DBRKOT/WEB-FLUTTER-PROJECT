@@ -5,15 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/auth_notifier.dart';
-import '../core/permissions.dart';
-
 import '../core/breakpoints.dart';
-import '../core/api_exceptions.dart';
-import '../core/field_validation_exception.dart';
+import '../core/permissions.dart';
 import '../models/simple_query.dart';
 import '../models/supplier.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
-import '../state/supplier_list_notifier.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
@@ -58,17 +55,15 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
     final fromUrl = SimpleQuery.fromUri(GoRouterState.of(context).uri);
     final notifier = context.read<SupplierListNotifier>();
+    if (_searchController.text != fromUrl.search) {
+      _searchController.text = fromUrl.search;
+    }
     if (fromUrl == notifier.query) {
-      if (_searchController.text != fromUrl.search) {
-        _searchController.text = fromUrl.search;
-      }
+      if (notifier.status == LoadStatus.idle) notifier.load();
       return;
     }
 
     _applyingFromUrl = true;
-    if (_searchController.text != fromUrl.search) {
-      _searchController.text = fromUrl.search;
-    }
     notifier.applyQuery(fromUrl).whenComplete(() {
       _applyingFromUrl = false;
     });
@@ -85,47 +80,16 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
       final q = context.read<SupplierListNotifier>().query;
       _apply(q.copyWith(search: value));
     });
   }
 
-  Future<void> _runDelete(Future<void> Function() action) async {
-    try {
-      await action();
-    } on FieldValidationException catch (e) {
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Нельзя удалить'),
-          content: Text(e.message),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Понятно'),
-            ),
-          ],
-        ),
-      );
-    } on ConflictException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('409: ${e.message}')));
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Ошибка удаления: $e')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<SupplierListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     final q = notifier.query;
 
     return Scaffold(
@@ -135,17 +99,25 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Center(child: Text('${notifier.selected.length}')),
+              child: Center(
+                child: Text('Выбрано: ${notifier.selected.length}'),
+              ),
             ),
-          if (notifier.hasSelection)
+          if (notifier.hasSelection && auth.canHardDelete)
             IconButton(
               tooltip: 'Удалить выбранные',
               onPressed: () => _confirmDeleteSelected(context),
               icon: const Icon(Icons.delete_sweep),
             ),
+          IconButton(
+            tooltip: 'Показать ошибку загрузки',
+            onPressed: () =>
+                context.read<SupplierListNotifier>().simulateError(),
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
         ],
       ),
-      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+      floatingActionButton: auth.canEditCatalog
           ? FloatingActionButton(
               tooltip: 'Новый поставщик',
               onPressed: () => context.push('/suppliers/new'),
@@ -162,11 +134,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: 220,
+                  width: 280,
                   child: TextField(
+                    key: const Key('supplier-search'),
                     controller: _searchController,
                     decoration: const InputDecoration(
-                      labelText: 'Поиск',
+                      labelText: 'Поиск: название, город, договор',
                       prefixIcon: Icon(Icons.search, size: 20),
                       border: OutlineInputBorder(),
                       isDense: true,
@@ -174,11 +147,33 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     onChanged: _onSearchChanged,
                   ),
                 ),
-                FilterChip(
-                  label: const Text('Удалённые'),
-                  selected: q.includeDeleted,
-                  onSelected: (value) =>
-                      _apply(q.copyWith(includeDeleted: value)),
+                SizedBox(
+                  width: 180,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('supplier-sort-${q.sortField}'),
+                    isExpanded: true,
+                    initialValue: q.sortField,
+                    decoration: const InputDecoration(
+                      labelText: 'Сортировка',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'name', child: Text('Название')),
+                      DropdownMenuItem(value: 'city', child: Text('Город')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) _apply(q.copyWith(sortField: value));
+                    },
+                  ),
+                ),
+                IconButton(
+                  tooltip: q.sortAscending ? 'По возрастанию' : 'По убыванию',
+                  onPressed: () =>
+                      _apply(q.copyWith(sortAscending: !q.sortAscending)),
+                  icon: Icon(
+                    q.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                  ),
                 ),
               ],
             ),
@@ -194,7 +189,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   ? _SupplierCards(
                       items: notifier.result.items,
                       selected: notifier.selected,
-                      onDelete: _runDelete,
+                      onDelete: (s) => _confirmDelete(context, s),
                     )
                   : EntityTable<Supplier>(
                       items: notifier.result.items,
@@ -203,7 +198,6 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                       onToggleSelect: (id) => context
                           .read<SupplierListNotifier>()
                           .toggleSelection(id),
-                      isDeleted: (s) => s.isDeleted,
                       sortField: q.sortField,
                       sortAscending: q.sortAscending,
                       onSort: (field) => _apply(
@@ -221,14 +215,26 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                           build: (s) => tableCellText(s.name),
                         ),
                         TableColumnSpec(
-                          label: 'Страна',
-                          sortField: 'country',
-                          build: (s) => tableCellText(s.country),
+                          label: 'Город',
+                          sortField: 'city',
+                          build: (s) =>
+                              tableCellText(s.city.isEmpty ? '—' : s.city),
                         ),
                         TableColumnSpec(
                           label: 'Телефон',
                           build: (s) =>
                               tableCellText(s.phone.isEmpty ? '—' : s.phone),
+                        ),
+                        TableColumnSpec(
+                          label: 'Почта',
+                          build: (s) =>
+                              tableCellText(s.email.isEmpty ? '—' : s.email),
+                        ),
+                        TableColumnSpec(
+                          label: 'Договор',
+                          build: (s) => tableCellText(
+                            s.contractNumber.isEmpty ? '—' : s.contractNumber,
+                          ),
                         ),
                       ],
                       actions: (s) => _actions(context, s),
@@ -251,116 +257,68 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   }
 
   List<Widget> _actions(BuildContext context, Supplier supplier) {
-    final n = context.read<SupplierListNotifier>();
     final auth = context.watch<AuthNotifier>();
-    if (supplier.isDeleted) {
-      return [
-        if (auth.canRestore)
-          IconButton(
-            tooltip: 'Восстановить',
-            icon: const Icon(Icons.restore),
-            onPressed: () => n.restore(supplier.id),
-          ),
-        if (auth.canHardDelete)
-          IconButton(
-            tooltip: 'Удалить навсегда',
-            icon: const Icon(Icons.delete_forever),
-            onPressed: () => _confirmHardDelete(context, supplier),
-          ),
-      ];
-    }
     return [
       IconButton(
         tooltip: 'Открыть',
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/suppliers/${supplier.id}'),
       ),
-      if (auth.canEditCatalog) ...[
+      if (auth.canEditCatalog)
         IconButton(
           tooltip: 'Изменить',
           icon: const Icon(Icons.edit_outlined),
           onPressed: () => context.push('/suppliers/${supplier.id}/edit'),
         ),
-        IconButton(
-          tooltip: 'Удалить (логически)',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => _confirmSoftDelete(context, supplier),
-        ),
-      ],
       if (auth.canHardDelete)
         IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, supplier),
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmDelete(context, supplier),
         ),
     ];
   }
 
-  Future<void> _confirmSoftDelete(
-    BuildContext context,
-    Supplier supplier,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Логическое удаление'),
-        content: Text('Скрыть поставщика «${supplier.name}»?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete(BuildContext context, Supplier supplier) async {
+    final ok = await _confirm(
+      context,
+      title: 'Удаление поставщика',
+      message:
+          'Удалить поставщика «${supplier.name}»? '
+          'Запись будет стёрта безвозвратно, восстановить её нельзя.',
+      action: 'Удалить',
     );
-    if (ok == true && context.mounted) {
-      await _runDelete(
-        () => context.read<SupplierListNotifier>().softDelete(supplier.id),
-      );
-    }
-  }
-
-  Future<void> _confirmHardDelete(
-    BuildContext context,
-    Supplier supplier,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Физическое удаление'),
-        content: Text('Стереть поставщика «${supplier.name}» навсегда?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Стереть'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      await _runDelete(
-        () => context.read<SupplierListNotifier>().hardDelete(supplier.id),
-      );
+    if (ok && context.mounted) {
+      await context.read<SupplierListNotifier>().softDelete(supplier.id);
     }
   }
 
   Future<void> _confirmDeleteSelected(BuildContext context) async {
     final notifier = context.read<SupplierListNotifier>();
+    final ok = await _confirm(
+      context,
+      title: 'Удалить выбранные',
+      message:
+          'Удалить ${notifier.selected.length} поставщик(ов)? '
+          'Восстановить записи будет нельзя.',
+      action: 'Удалить',
+    );
+    if (ok && context.mounted) {
+      await notifier.deleteSelected();
+    }
+  }
+
+  Future<bool> _confirm(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String action,
+  }) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить выбранные'),
-        content: Text(
-          'Логически удалить ${notifier.selected.length} поставщик(ов)?',
-        ),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -368,14 +326,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
+            child: Text(action),
           ),
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await _runDelete(() => notifier.deleteSelected());
-    }
+    return ok == true;
   }
 }
 
@@ -387,76 +343,61 @@ class _SupplierCards extends StatelessWidget {
   });
 
   final List<Supplier> items;
-  final Set<int> selected;
-  final Future<void> Function(Future<void> Function() action) onDelete;
+  final Set<String> selected;
+  final Future<void> Function(Supplier supplier) onDelete;
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.read<SupplierListNotifier>();
+    final auth = context.watch<AuthNotifier>();
+
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final s = items[index];
+        final contacts = [
+          if (s.phone.isNotEmpty) s.phone,
+          if (s.email.isNotEmpty) s.email,
+        ].join(' · ');
         return Card(
           margin: const EdgeInsets.only(bottom: 6),
-          color: s.isDeleted
-              ? Theme.of(context).colorScheme.errorContainer
-                    .withValues(alpha: 0.35)
-              : null,
           child: ListTile(
-            dense: true,
             leading: Checkbox(
               value: selected.contains(s.id),
               onChanged: (_) => notifier.toggleSelection(s.id),
             ),
             title: Text(s.name),
             subtitle: Text(
-              [s.country, if (s.phone.isNotEmpty) s.phone].join(' · '),
+              '${s.city.isEmpty ? 'город не указан' : s.city}\n'
+              '${contacts.isEmpty ? 'контакты не указаны' : contacts}',
             ),
+            isThreeLine: true,
             onTap: () => context.push('/suppliers/${s.id}'),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) async {
-                switch (value) {
-                  case 'edit':
-                    context.push('/suppliers/${s.id}/edit');
-                  case 'soft':
-                    await onDelete(() => notifier.softDelete(s.id));
-                  case 'hard':
-                    await onDelete(() => notifier.hardDelete(s.id));
-                  case 'restore':
-                    await notifier.restore(s.id);
-                }
-              },
-              itemBuilder: (context) {
-                final auth = context.watch<AuthNotifier>();
-                return [
-                  if (!s.isDeleted) ...[
-                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                    const PopupMenuItem(
-                      value: 'soft',
-                      child: Text('Удалить логически'),
-                    ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ] else ...[
-                    if (auth.canRestore)
-                      const PopupMenuItem(
-                        value: 'restore',
-                        child: Text('Восстановить'),
-                      ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ],
-                ];
-              },
-            ),
+            trailing: auth.canEditCatalog || auth.canHardDelete
+                ? PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      switch (value) {
+                        case 'edit':
+                          context.push('/suppliers/${s.id}/edit');
+                        case 'delete':
+                          await onDelete(s);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (auth.canEditCatalog)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Изменить'),
+                        ),
+                      if (auth.canHardDelete)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Удалить'),
+                        ),
+                    ],
+                  )
+                : null,
           ),
         );
       },

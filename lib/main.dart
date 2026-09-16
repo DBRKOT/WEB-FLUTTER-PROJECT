@@ -10,23 +10,10 @@ import 'core/auth_notifier.dart';
 import 'core/reference_cache.dart';
 import 'core/router.dart';
 import 'core/storage_migration.dart';
-import 'repositories/api_brand_repository.dart';
-import 'repositories/api_category_repository.dart';
-import 'repositories/api_customer_repository.dart';
-import 'repositories/api_loan_service.dart';
-import 'repositories/api_product_repository.dart';
-import 'repositories/api_supplier_repository.dart';
 import 'repositories/api_user_repository.dart';
-import 'repositories/brand_repository.dart';
-import 'repositories/category_repository.dart';
-import 'repositories/customer_repository.dart';
-import 'repositories/product_repository.dart';
-import 'repositories/supplier_repository.dart';
-import 'state/brand_list_notifier.dart';
-import 'state/category_list_notifier.dart';
-import 'state/customer_list_notifier.dart';
-import 'state/product_list_notifier.dart';
-import 'state/supplier_list_notifier.dart';
+import 'repositories/catalog_repositories.dart';
+import 'repositories/service_repositories.dart';
+import 'state/entity_notifiers.dart';
 import 'widgets/session_guard.dart';
 
 Future<void> main() async {
@@ -43,60 +30,21 @@ Future<void> main() async {
   auth = AuthNotifier(prefs, dio);
   await auth.restore();
 
-  final products = ApiProductRepository(dio);
-  final brands = ApiBrandRepository(dio);
-  final categories = ApiCategoryRepository(dio);
-  final suppliers = ApiSupplierRepository(dio, products);
-  final customers = ApiCustomerRepository(dio);
-  final cache = ReferenceCache(
-    brands: brands,
-    categories: categories,
-    suppliers: suppliers,
-  );
-
   runApp(
-    TechStoreApp(
-      prefs: prefs,
-      migrationMessage: migration.message,
-      dio: dio,
-      auth: auth,
-      products: products,
-      brands: brands,
-      categories: categories,
-      suppliers: suppliers,
-      customers: customers,
-      loans: ApiLoanService(dio),
-      referenceCache: cache,
-    ),
+    TechStoreApp(migrationMessage: migration.message, dio: dio, auth: auth),
   );
 }
 
 class TechStoreApp extends StatefulWidget {
   const TechStoreApp({
     super.key,
-    required this.prefs,
     required this.dio,
     required this.auth,
-    required this.products,
-    required this.brands,
-    required this.categories,
-    required this.suppliers,
-    required this.customers,
-    required this.loans,
-    required this.referenceCache,
     this.migrationMessage,
   });
 
-  final SharedPreferences prefs;
   final Dio dio;
   final AuthNotifier auth;
-  final ProductRepository products;
-  final BrandRepository brands;
-  final CategoryRepository categories;
-  final SupplierRepository suppliers;
-  final CustomerRepository customers;
-  final ApiLoanService loans;
-  final ReferenceCache referenceCache;
   final String? migrationMessage;
 
   @override
@@ -106,6 +54,32 @@ class TechStoreApp extends StatefulWidget {
 class _TechStoreAppState extends State<TechStoreApp> {
   late final GoRouter _router = createAppRouter(widget.auth);
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  late final PbProductRepository _products = PbProductRepository(widget.dio);
+  late final PbBrandRepository _brands = PbBrandRepository(widget.dio);
+  late final PbCategoryRepository _categories = PbCategoryRepository(
+    widget.dio,
+  );
+  late final PbSupplierRepository _suppliers = PbSupplierRepository(widget.dio);
+  late final PbStockRepository _stock = PbStockRepository(widget.dio);
+  late final PbCustomerRepository _customers = PbCustomerRepository(widget.dio);
+  late final PbServiceRepository _services = PbServiceRepository(widget.dio);
+  late final PbMasterRepository _masters = PbMasterRepository(widget.dio);
+  late final PbRepairRepository _repairs = PbRepairRepository(widget.dio);
+  late final PbOrderRepository _orders = PbOrderRepository(widget.dio);
+  late final PbOrderItemRepository _orderItems = PbOrderItemRepository(
+    widget.dio,
+  );
+
+  late final ReferenceCache _cache = ReferenceCache(
+    brands: _brands,
+    categories: _categories,
+    suppliers: _suppliers,
+    products: _products,
+    services: _services,
+    masters: _masters,
+    customers: _customers,
+  );
 
   @override
   void initState() {
@@ -129,74 +103,93 @@ class _TechStoreAppState extends State<TechStoreApp> {
     super.dispose();
   }
 
+  ChangeNotifierProvider<T> _listProvider<T extends ChangeNotifier>(
+    T Function() create,
+    Future<void> Function(T notifier) load,
+  ) {
+    return ChangeNotifierProvider<T>(
+      create: (_) {
+        final notifier = create();
+        _loadWhenAuthenticated(widget.auth, () => load(notifier));
+        return notifier;
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         Provider<Dio>.value(value: widget.dio),
         ChangeNotifierProvider<AuthNotifier>.value(value: widget.auth),
-        Provider<ApiLoanService>.value(value: widget.loans),
+        Provider<ReferenceCache>.value(value: _cache),
         Provider<ApiUserRepository>(
           create: (context) => ApiUserRepository(context.read<Dio>()),
         ),
-        Provider<ReferenceCache>.value(value: widget.referenceCache),
-        Provider<ProductRepository>.value(value: widget.products),
-        Provider<BrandRepository>.value(value: widget.brands),
-        Provider<CategoryRepository>.value(value: widget.categories),
-        Provider<SupplierRepository>.value(value: widget.suppliers),
-        Provider<CustomerRepository>.value(value: widget.customers),
-        ChangeNotifierProvider(
-          create: (context) {
-            final auth = context.read<AuthNotifier>();
-            final notifier = ProductListNotifier(
-              context.read<ProductRepository>(),
-            );
-            _loadWhenAuthenticated(auth, notifier.load);
-            return notifier;
-          },
+        Provider<PbProductRepository>.value(value: _products),
+        Provider<PbStockRepository>.value(value: _stock),
+        Provider<PbCustomerRepository>.value(value: _customers),
+        Provider<PbRepairRepository>.value(value: _repairs),
+        Provider<PbOrderRepository>.value(value: _orders),
+        Provider<PbOrderItemRepository>.value(value: _orderItems),
+
+        _listProvider<ProductListNotifier>(
+          () => ProductListNotifier(
+            _products,
+            onInvalidate: _cache.invalidateProducts,
+          ),
+          (n) => n.load(),
         ),
-        ChangeNotifierProvider(
-          create: (context) {
-            final auth = context.read<AuthNotifier>();
-            final notifier = BrandListNotifier(
-              context.read<BrandRepository>(),
-              cache: context.read<ReferenceCache>(),
-            );
-            _loadWhenAuthenticated(auth, notifier.load);
-            return notifier;
-          },
+        _listProvider<BrandListNotifier>(
+          () =>
+              BrandListNotifier(_brands, onInvalidate: _cache.invalidateBrands),
+          (n) => n.load(),
         ),
-        ChangeNotifierProvider(
-          create: (context) {
-            final auth = context.read<AuthNotifier>();
-            final notifier = CategoryListNotifier(
-              context.read<CategoryRepository>(),
-              cache: context.read<ReferenceCache>(),
-            );
-            _loadWhenAuthenticated(auth, notifier.load);
-            return notifier;
-          },
+        _listProvider<CategoryListNotifier>(
+          () => CategoryListNotifier(
+            _categories,
+            onInvalidate: _cache.invalidateCategories,
+          ),
+          (n) => n.load(),
         ),
-        ChangeNotifierProvider(
-          create: (context) {
-            final auth = context.read<AuthNotifier>();
-            final notifier = SupplierListNotifier(
-              context.read<SupplierRepository>(),
-              cache: context.read<ReferenceCache>(),
-            );
-            _loadWhenAuthenticated(auth, notifier.load);
-            return notifier;
-          },
+        _listProvider<SupplierListNotifier>(
+          () => SupplierListNotifier(
+            _suppliers,
+            onInvalidate: _cache.invalidateSuppliers,
+          ),
+          (n) => n.load(),
         ),
-        ChangeNotifierProvider(
-          create: (context) {
-            final auth = context.read<AuthNotifier>();
-            final notifier = CustomerListNotifier(
-              context.read<CustomerRepository>(),
-            );
-            _loadWhenAuthenticated(auth, notifier.load);
-            return notifier;
-          },
+        _listProvider<CustomerListNotifier>(
+          () => CustomerListNotifier(
+            _customers,
+            onInvalidate: _cache.invalidateCustomers,
+          ),
+          (n) => n.load(),
+        ),
+
+        ChangeNotifierProvider<StockListNotifier>(
+          create: (_) => StockListNotifier(_stock),
+        ),
+        ChangeNotifierProvider<ServiceListNotifier>(
+          create: (_) => ServiceListNotifier(
+            _services,
+            onInvalidate: _cache.invalidateServices,
+          ),
+        ),
+        ChangeNotifierProvider<MasterListNotifier>(
+          create: (_) => MasterListNotifier(
+            _masters,
+            onInvalidate: _cache.invalidateMasters,
+          ),
+        ),
+        ChangeNotifierProvider<RepairListNotifier>(
+          create: (_) => RepairListNotifier(_repairs),
+        ),
+        ChangeNotifierProvider<OrderListNotifier>(
+          create: (_) => OrderListNotifier(_orders),
+        ),
+        ChangeNotifierProvider<OrderItemsNotifier>(
+          create: (_) => OrderItemsNotifier(_orderItems, _orders),
         ),
       ],
       child: MaterialApp.router(

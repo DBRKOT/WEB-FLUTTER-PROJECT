@@ -6,13 +6,13 @@ import '../core/api_exceptions.dart';
 import '../core/form_api_errors.dart';
 import '../core/validators.dart';
 import '../models/category.dart';
-import '../state/category_list_notifier.dart';
+import '../state/entity_notifiers.dart';
 import '../widgets/entity_form_scaffold.dart';
 
 class CategoryFormScreen extends StatefulWidget {
   const CategoryFormScreen({super.key, this.id});
 
-  final int? id;
+  final String? id;
   bool get isEditing => id != null;
 
   @override
@@ -23,6 +23,8 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  final Map<String, String> _serverErrors = {};
 
   bool _loading = true;
   bool _saving = false;
@@ -45,8 +47,13 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     super.dispose();
   }
 
-  void _markDirty([String? _]) {
-    if (!_dirty) setState(() => _dirty = true);
+  void _markDirty(String field) {
+    _serverErrors.remove(field);
+    if (!_dirty) {
+      setState(() => _dirty = true);
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -74,9 +81,43 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = '$e';
+        _loadError = apiErrorMessage(e);
         _loading = false;
       });
+    }
+  }
+
+  String? _validateName(String? value) {
+    final base = V.combine([
+      V.required('Укажите название категории'),
+      V.length(min: 2, max: 80),
+    ])(value);
+    return base ?? _serverErrors['name'];
+  }
+
+  String? _validateDescription(String? value) {
+    final base = V.optional(V.length(max: 500))(value);
+    return base ?? _serverErrors['description'];
+  }
+
+  void _applyServerErrors(Map<String, String> errors, String fallback) {
+    const known = {'name', 'description'};
+    final unknown = <String>[];
+    setState(() {
+      _serverErrors.clear();
+      errors.forEach((field, message) {
+        if (known.contains(field)) {
+          _serverErrors[field] = message;
+        } else {
+          unknown.add(message);
+        }
+      });
+    });
+    _formKey.currentState?.validate();
+    if (_serverErrors.isEmpty) {
+      final message = unknown.isEmpty ? fallback : unknown.first;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -84,13 +125,23 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      final category = Category(
-        id: _existing?.id ?? 0,
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        deletedAt: _existing?.deletedAt,
-      );
+      final name = _nameController.text.trim();
       final notifier = context.read<CategoryListNotifier>();
+
+      final taken = await notifier.isNameTaken(name, excludeId: _existing?.id);
+      if (taken) {
+        if (!mounted) return;
+        _applyServerErrors({
+          'name': 'Категория с таким названием уже есть',
+        }, 'Название занято');
+        return;
+      }
+
+      final category = Category(
+        id: _existing?.id ?? '',
+        name: name,
+        description: _descriptionController.text.trim(),
+      );
       if (widget.isEditing) {
         await notifier.update(category);
       } else {
@@ -101,8 +152,10 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
       context.pop();
     } on ValidationException catch (e) {
       if (!mounted) return;
-      final msg = e.errors.values.isEmpty ? e.message : e.errors.values.first;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      _applyServerErrors(e.errors, e.message);
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      _applyServerErrors(e.errors, e.message);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -134,18 +187,16 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
         FormFieldSpec(
           label: 'Название',
           controller: _nameController,
-          onChanged: _markDirty,
-          validator: V.combine([
-            V.required('Укажите название'),
-            V.length(min: 2, max: 80),
-          ]),
+          onChanged: (_) => _markDirty('name'),
+          validator: _validateName,
         ),
         FormFieldSpec(
           label: 'Описание',
           controller: _descriptionController,
-          maxLines: 3,
-          onChanged: _markDirty,
-          validator: V.length(max: 500),
+          keyboardType: TextInputType.multiline,
+          maxLines: 4,
+          onChanged: (_) => _markDirty('description'),
+          validator: _validateDescription,
         ),
       ],
     );

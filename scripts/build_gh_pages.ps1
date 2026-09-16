@@ -2,7 +2,9 @@
 
 param(
   [string]$BaseHref = "/WEB-FLUTTER-PROJECT/",
-  [string]$ApiBaseUrl = "http://localhost:8080/api",
+  # Адрес REST API PocketBase. Для опубликованной сборки нужен адрес,
+  # доступный из браузера: локальный 127.0.0.1 виден только на своей машине.
+  [string]$ApiBaseUrl = "http://127.0.0.1:8090/api",
   [string]$OutDir = "build/web"
 )
 

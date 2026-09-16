@@ -12,10 +12,16 @@ function arg(name, fallback) {
 }
 
 const PORT = Number(arg('port', process.env.PORT || 8080));
-const ORIGIN = arg('origin', process.env.CORS_ORIGIN || '*');
+
+const ORIGINS = String(arg('origin', process.env.CORS_ORIGIN || '*'))
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 const SECRET = 'учебный-ключ-не-для-продакшена';
 const ACCESS_TTL = Number(arg('ttl', 900));      // секунд
 const REFRESH_TTL = 60 * 60 * 24 * 7;
+
+let currentReq = null;
 
 // ─────────────────────────────── токены ───────────────────────────────
 
@@ -399,8 +405,15 @@ function validate(collection, body, id = null) {
 }
 
 
+function pickCorsOrigin() {
+  const incoming = currentReq?.headers?.origin;
+  if (ORIGINS.includes('*')) return incoming || '*';
+  if (incoming && ORIGINS.includes(incoming)) return incoming;
+  return ORIGINS[0] || '*';
+}
+
 function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', ORIGIN);
+  res.setHeader('Access-Control-Allow-Origin', pickCorsOrigin());
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
@@ -804,6 +817,7 @@ function normalize(collection, body) {
 seed();
 
 const server = http.createServer(async (req, res) => {
+  currentReq = req;
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (req.method === 'OPTIONS') {
@@ -831,7 +845,7 @@ server.listen(PORT, () => {
   console.log('');
   console.log('  Учебное API «Библиотека»');
   console.log(`  Адрес:              http://localhost:${PORT}/api`);
-  console.log(`  Разрешённый источник: ${ORIGIN}`);
+  console.log(`  Разрешённые источники: ${ORIGINS.join(', ')}`);
   console.log(`  Срок жизни токена:  ${ACCESS_TTL} с`);
   console.log('');
   console.log('  Учётные записи:  admin/admin123   manager/manager123   client/client123');

@@ -5,17 +5,23 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/auth_notifier.dart';
-import '../core/permissions.dart';
-
 import '../core/breakpoints.dart';
+import '../core/permissions.dart';
 import '../models/customer.dart';
 import '../models/simple_query.dart';
-import '../state/customer_list_notifier.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/paginator_bar.dart';
 import '../widgets/table_cell_text.dart';
+
+String _formatDay(DateTime? value) {
+  if (value == null) return '—';
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  return '$day.$month.${value.year}';
+}
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -54,15 +60,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (location == _lastSyncedLocation) return;
     _lastSyncedLocation = location;
 
-    final fromUrl = SimpleQuery.fromUri(
-      GoRouterState.of(context).uri,
-      defaultSort: 'fullName',
-    );
+    final fromUrl = SimpleQuery.fromUri(GoRouterState.of(context).uri);
     final notifier = context.read<CustomerListNotifier>();
     if (fromUrl == notifier.query) {
       if (_searchController.text != fromUrl.search) {
         _searchController.text = fromUrl.search;
       }
+      if (notifier.status == LoadStatus.idle) notifier.load();
       return;
     }
 
@@ -94,6 +98,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<CustomerListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     final q = notifier.query;
 
     return Scaffold(
@@ -103,19 +108,27 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Center(child: Text('${notifier.selected.length}')),
+              child: Center(
+                child: Text('Выбрано: ${notifier.selected.length}'),
+              ),
             ),
-          if (notifier.hasSelection)
+          if (notifier.hasSelection && auth.canHardDelete)
             IconButton(
               tooltip: 'Удалить выбранные',
               onPressed: () => _confirmDeleteSelected(context),
               icon: const Icon(Icons.delete_sweep),
             ),
+          IconButton(
+            tooltip: 'Показать ошибку загрузки',
+            onPressed: () =>
+                context.read<CustomerListNotifier>().simulateError(),
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
         ],
       ),
-      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+      floatingActionButton: auth.canEditCatalog
           ? FloatingActionButton(
-              tooltip: 'Новый клиент',
+              tooltip: 'Новый профиль клиента',
               onPressed: () => context.push('/customers/new'),
               child: const Icon(Icons.add),
             )
@@ -123,32 +136,20 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: 220,
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Поиск',
-                      prefixIcon: Icon(Icons.search, size: 20),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: _onSearchChanged,
-                  ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: SizedBox(
+              width: 280,
+              child: TextField(
+                key: const Key('customer-search'),
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  labelText: 'Поиск: имя, почта, телефон, адрес',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                  isDense: true,
                 ),
-                FilterChip(
-                  label: const Text('Удалённые'),
-                  selected: q.includeDeleted,
-                  onSelected: (value) =>
-                      _apply(q.copyWith(includeDeleted: value)),
-                ),
-              ],
+                onChanged: _onSearchChanged,
+              ),
             ),
           ),
           Expanded(
@@ -162,6 +163,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   ? _CustomerCards(
                       items: notifier.result.items,
                       selected: notifier.selected,
+                      onDelete: (customer) => _confirmDelete(context, customer),
                     )
                   : EntityTable<Customer>(
                       items: notifier.result.items,
@@ -170,7 +172,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       onToggleSelect: (id) => context
                           .read<CustomerListNotifier>()
                           .toggleSelection(id),
-                      isDeleted: (c) => c.isDeleted,
                       sortField: q.sortField,
                       sortAscending: q.sortAscending,
                       onSort: (field) => _apply(
@@ -183,20 +184,32 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       ),
                       columns: [
                         TableColumnSpec(
-                          label: 'ФИО',
-                          sortField: 'fullName',
-                          build: (c) => tableCellText(c.fullName),
+                          label: 'Клиент',
+                          sortField: 'name',
+                          build: (c) => tableCellText(c.displayName),
                         ),
                         TableColumnSpec(
-                          label: 'Email',
+                          label: 'Почта',
                           sortField: 'email',
                           build: (c) => tableCellText(c.email),
                         ),
                         TableColumnSpec(
-                          label: 'Карта',
+                          label: 'Телефон',
+                          sortField: 'phone',
+                          build: (c) =>
+                              tableCellText(c.phone.isEmpty ? '—' : c.phone),
+                        ),
+                        TableColumnSpec(
+                          label: 'Адрес',
+                          sortField: 'address',
                           build: (c) => tableCellText(
-                            '${c.card.number} · ${c.card.level}',
+                            c.address.isEmpty ? '—' : c.address,
                           ),
+                        ),
+                        TableColumnSpec(
+                          label: 'Дата рождения',
+                          sortField: 'birthDate',
+                          build: (c) => Text(_formatDay(c.birthDate)),
                         ),
                       ],
                       actions: (c) => _actions(context, c),
@@ -219,60 +232,37 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   List<Widget> _actions(BuildContext context, Customer customer) {
-    final n = context.read<CustomerListNotifier>();
     final auth = context.watch<AuthNotifier>();
-    if (customer.isDeleted) {
-      return [
-        if (auth.canRestore)
-          IconButton(
-            tooltip: 'Восстановить',
-            icon: const Icon(Icons.restore),
-            onPressed: () => n.restore(customer.id),
-          ),
-        if (auth.canHardDelete)
-          IconButton(
-            tooltip: 'Удалить навсегда',
-            icon: const Icon(Icons.delete_forever),
-            onPressed: () => _confirmHardDelete(context, customer),
-          ),
-      ];
-    }
     return [
       IconButton(
         tooltip: 'Открыть',
         icon: const Icon(Icons.visibility_outlined),
         onPressed: () => context.push('/customers/${customer.id}'),
       ),
-      if (auth.canEditCatalog) ...[
+      if (auth.canEditCatalog)
         IconButton(
           tooltip: 'Изменить',
           icon: const Icon(Icons.edit_outlined),
           onPressed: () => context.push('/customers/${customer.id}/edit'),
         ),
-        IconButton(
-          tooltip: 'Удалить (логически)',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => _confirmSoftDelete(context, customer),
-        ),
-      ],
       if (auth.canHardDelete)
         IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, customer),
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmDelete(context, customer),
         ),
     ];
   }
 
-  Future<void> _confirmSoftDelete(
-    BuildContext context,
-    Customer customer,
-  ) async {
+  Future<void> _confirmDelete(BuildContext context, Customer customer) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Логическое удаление'),
-        content: Text('Скрыть клиента «${customer.fullName}»?'),
+        title: const Text('Удаление профиля'),
+        content: Text(
+          'Удалить профиль клиента «${customer.displayName}»? '
+          'Профиль будет стёрт безвозвратно, учётная запись останется.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -281,32 +271,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Удалить'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      await context.read<CustomerListNotifier>().softDelete(customer.id);
-    }
-  }
-
-  Future<void> _confirmHardDelete(
-    BuildContext context,
-    Customer customer,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Физическое удаление'),
-        content: Text('Стереть клиента «${customer.fullName}» навсегда?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Стереть'),
           ),
         ],
       ),
@@ -323,7 +287,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Удалить выбранные'),
         content: Text(
-          'Логически удалить ${notifier.selected.length} клиент(ов)?',
+          'Удалить ${notifier.selected.length} профиль(ей) клиентов? '
+          'Восстановить их будет нельзя.',
         ),
         actions: [
           TextButton(
@@ -338,82 +303,69 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      await context.read<CustomerListNotifier>().deleteSelected();
+      await notifier.deleteSelected();
     }
   }
 }
 
 class _CustomerCards extends StatelessWidget {
-  const _CustomerCards({required this.items, required this.selected});
+  const _CustomerCards({
+    required this.items,
+    required this.selected,
+    required this.onDelete,
+  });
 
   final List<Customer> items;
-  final Set<int> selected;
+  final Set<String> selected;
+  final Future<void> Function(Customer customer) onDelete;
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.read<CustomerListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final c = items[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          color: c.isDeleted
-              ? Theme.of(context).colorScheme.errorContainer
-                    .withValues(alpha: 0.35)
-              : null,
+          margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
-            dense: true,
             leading: Checkbox(
               value: selected.contains(c.id),
               onChanged: (_) => notifier.toggleSelection(c.id),
             ),
-            title: Text(c.fullName),
-            subtitle: Text('${c.email} · ${c.card.level}'),
-            onTap: () => context.push('/customers/${c.id}'),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) async {
-                switch (value) {
-                  case 'edit':
-                    context.push('/customers/${c.id}/edit');
-                  case 'soft':
-                    await notifier.softDelete(c.id);
-                  case 'hard':
-                    await notifier.hardDelete(c.id);
-                  case 'restore':
-                    await notifier.restore(c.id);
-                }
-              },
-              itemBuilder: (context) {
-                final auth = context.watch<AuthNotifier>();
-                return [
-                  if (!c.isDeleted) ...[
-                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                    const PopupMenuItem(
-                      value: 'soft',
-                      child: Text('Удалить логически'),
-                    ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ] else ...[
-                    if (auth.canRestore)
-                      const PopupMenuItem(
-                        value: 'restore',
-                        child: Text('Восстановить'),
-                      ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ],
-                ];
-              },
+            title: Text(c.displayName),
+            subtitle: Text(
+              '${c.email.isEmpty ? '—' : c.email}\n'
+              '${c.phone.isEmpty ? 'Телефон не указан' : c.phone}',
             ),
+            isThreeLine: true,
+            onTap: () => context.push('/customers/${c.id}'),
+            trailing: auth.canEditCatalog || auth.canHardDelete
+                ? PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      switch (value) {
+                        case 'edit':
+                          context.push('/customers/${c.id}/edit');
+                        case 'delete':
+                          await onDelete(c);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (auth.canEditCatalog)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Изменить'),
+                        ),
+                      if (auth.canHardDelete)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Удалить'),
+                        ),
+                    ],
+                  )
+                : null,
           ),
         );
       },

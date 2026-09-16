@@ -1,51 +1,51 @@
 class Supplier {
-  final int id;
+  final String id;
   final String name;
-  final String country;
+  final String city;
   final String phone;
-  final DateTime? deletedAt;
+  final String email;
+  final String contractNumber;
 
   const Supplier({
     required this.id,
     required this.name,
-    required this.country,
+    required this.city,
     this.phone = '',
-    this.deletedAt,
+    this.email = '',
+    this.contractNumber = '',
   });
-
-  bool get isDeleted => deletedAt != null;
 
   Supplier copyWith({
     String? name,
-    String? country,
+    String? city,
     String? phone,
-    DateTime? deletedAt,
-    bool clearDeletedAt = false,
+    String? email,
+    String? contractNumber,
   }) {
     return Supplier(
       id: id,
       name: name ?? this.name,
-      country: country ?? this.country,
+      city: city ?? this.city,
       phone: phone ?? this.phone,
-      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+      email: email ?? this.email,
+      contractNumber: contractNumber ?? this.contractNumber,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
     'name': name,
-    'country': country,
+    'city': city,
     'phone': phone,
-    'deletedAt': deletedAt?.toIso8601String(),
+    'email': email,
+    'contractNumber': contractNumber,
   };
 
   factory Supplier.fromJson(Map<String, dynamic> json) => Supplier(
-    id: json['id'] as int? ?? 0,
+    id: json['id'] as String? ?? '',
     name: json['name'] as String? ?? '',
-    country: (json['country'] ?? json['city'] ?? '') as String,
+    city: json['city'] as String? ?? '',
     phone: json['phone'] as String? ?? '',
-    deletedAt: json['deletedAt'] == null
-        ? null
-        : DateTime.tryParse(json['deletedAt'] as String),
+    email: json['email'] as String? ?? '',
+    contractNumber: json['contractNumber'] as String? ?? '',
   );
 }

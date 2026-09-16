@@ -5,12 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/auth_notifier.dart';
-import '../core/permissions.dart';
-
 import '../core/breakpoints.dart';
+import '../core/permissions.dart';
 import '../models/category.dart';
 import '../models/simple_query.dart';
-import '../state/category_list_notifier.dart';
+import '../state/entity_notifiers.dart';
 import '../state/load_status.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/load_state_view.dart';
@@ -83,6 +82,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
       final q = context.read<CategoryListNotifier>().query;
       _apply(q.copyWith(search: value));
     });
@@ -91,6 +91,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<CategoryListNotifier>();
+    final auth = context.watch<AuthNotifier>();
     final q = notifier.query;
 
     return Scaffold(
@@ -100,17 +101,25 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Center(child: Text('${notifier.selected.length}')),
+              child: Center(
+                child: Text('Выбрано: ${notifier.selected.length}'),
+              ),
             ),
-          if (notifier.hasSelection)
+          if (notifier.hasSelection && auth.canHardDelete)
             IconButton(
               tooltip: 'Удалить выбранные',
               onPressed: () => _confirmDeleteSelected(context),
               icon: const Icon(Icons.delete_sweep),
             ),
+          IconButton(
+            tooltip: 'Показать ошибку загрузки',
+            onPressed: () =>
+                context.read<CategoryListNotifier>().simulateError(),
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
         ],
       ),
-      floatingActionButton: context.watch<AuthNotifier>().canEditCatalog
+      floatingActionButton: auth.canEditCatalog
           ? FloatingActionButton(
               tooltip: 'Новая категория',
               onPressed: () => context.push('/categories/new'),
@@ -127,11 +136,12 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: 220,
+                  width: 260,
                   child: TextField(
+                    key: const Key('category-search'),
                     controller: _searchController,
                     decoration: const InputDecoration(
-                      labelText: 'Поиск',
+                      labelText: 'Поиск по названию и описанию',
                       prefixIcon: Icon(Icons.search, size: 20),
                       border: OutlineInputBorder(),
                       isDense: true,
@@ -139,11 +149,32 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                     onChanged: _onSearchChanged,
                   ),
                 ),
-                FilterChip(
-                  label: const Text('Удалённые'),
-                  selected: q.includeDeleted,
-                  onSelected: (value) =>
-                      _apply(q.copyWith(includeDeleted: value)),
+                SizedBox(
+                  width: 220,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('category-sort-${q.sortField}'),
+                    isExpanded: true,
+                    initialValue: q.sortField,
+                    decoration: const InputDecoration(
+                      labelText: 'Сортировка',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'name', child: Text('Название')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) _apply(q.copyWith(sortField: value));
+                    },
+                  ),
+                ),
+                IconButton(
+                  tooltip: q.sortAscending ? 'По возрастанию' : 'По убыванию',
+                  onPressed: () =>
+                      _apply(q.copyWith(sortAscending: !q.sortAscending)),
+                  icon: Icon(
+                    q.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                  ),
                 ),
               ],
             ),
@@ -159,6 +190,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                   ? _CategoryCards(
                       items: notifier.result.items,
                       selected: notifier.selected,
+                      onDelete: (c) => _confirmDelete(context, c),
                     )
                   : EntityTable<Category>(
                       items: notifier.result.items,
@@ -167,7 +199,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                       onToggleSelect: (id) => context
                           .read<CategoryListNotifier>()
                           .toggleSelection(id),
-                      isDeleted: (c) => c.isDeleted,
                       sortField: q.sortField,
                       sortAscending: q.sortAscending,
                       onSort: (field) => _apply(
@@ -186,8 +217,9 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                         ),
                         TableColumnSpec(
                           label: 'Описание',
-                          sortField: 'description',
-                          build: (c) => tableCellText(c.description),
+                          build: (c) => tableCellText(
+                            c.description.isEmpty ? '—' : c.description,
+                          ),
                         ),
                       ],
                       actions: (c) => _actions(context, c),
@@ -210,112 +242,64 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   }
 
   List<Widget> _actions(BuildContext context, Category category) {
-    final n = context.read<CategoryListNotifier>();
     final auth = context.watch<AuthNotifier>();
-    if (category.isDeleted) {
-      return [
-        if (auth.canRestore)
-          IconButton(
-            tooltip: 'Восстановить',
-            icon: const Icon(Icons.restore),
-            onPressed: () => n.restore(category.id),
-          ),
-        if (auth.canHardDelete)
-          IconButton(
-            tooltip: 'Удалить навсегда',
-            icon: const Icon(Icons.delete_forever),
-            onPressed: () => _confirmHardDelete(context, category),
-          ),
-      ];
-    }
     return [
       IconButton(
-        tooltip: 'Открыть',
-        icon: const Icon(Icons.visibility_outlined),
+        tooltip: 'Карточка',
+        icon: const Icon(Icons.info_outline),
         onPressed: () => context.push('/categories/${category.id}'),
       ),
-      if (auth.canEditCatalog) ...[
+      if (auth.canEditCatalog)
         IconButton(
           tooltip: 'Изменить',
           icon: const Icon(Icons.edit_outlined),
           onPressed: () => context.push('/categories/${category.id}/edit'),
         ),
-        IconButton(
-          tooltip: 'Удалить (логически)',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => _confirmSoftDelete(context, category),
-        ),
-      ],
       if (auth.canHardDelete)
         IconButton(
-          tooltip: 'Удалить навсегда',
-          icon: const Icon(Icons.delete_forever),
-          onPressed: () => _confirmHardDelete(context, category),
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _confirmDelete(context, category),
         ),
     ];
   }
 
-  Future<void> _confirmSoftDelete(
-    BuildContext context,
-    Category category,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Логическое удаление'),
-        content: Text('Скрыть категорию «${category.name}»?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete(BuildContext context, Category category) async {
+    final ok = await _confirm(
+      context,
+      title: 'Удаление категории',
+      message: 'Удалить категорию «${category.name}» навсегда?',
+      action: 'Удалить',
     );
-    if (ok == true && context.mounted) {
+    if (ok && context.mounted) {
       await context.read<CategoryListNotifier>().softDelete(category.id);
-    }
-  }
-
-  Future<void> _confirmHardDelete(
-    BuildContext context,
-    Category category,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Физическое удаление'),
-        content: Text('Стереть категорию «${category.name}» навсегда?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Стереть'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      await context.read<CategoryListNotifier>().hardDelete(category.id);
     }
   }
 
   Future<void> _confirmDeleteSelected(BuildContext context) async {
     final notifier = context.read<CategoryListNotifier>();
+    final ok = await _confirm(
+      context,
+      title: 'Удалить выбранные',
+      message: 'Удалить ${notifier.selected.length} категорию(и) навсегда?',
+      action: 'Удалить',
+    );
+    if (ok && context.mounted) {
+      await notifier.deleteSelected();
+    }
+  }
+
+  Future<bool> _confirm(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String action,
+  }) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить выбранные'),
-        content: Text(
-          'Логически удалить ${notifier.selected.length} категори(й)?',
-        ),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -323,26 +307,31 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
+            child: Text(action),
           ),
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await context.read<CategoryListNotifier>().deleteSelected();
-    }
+    return ok == true;
   }
 }
 
 class _CategoryCards extends StatelessWidget {
-  const _CategoryCards({required this.items, required this.selected});
+  const _CategoryCards({
+    required this.items,
+    required this.selected,
+    required this.onDelete,
+  });
 
   final List<Category> items;
-  final Set<int> selected;
+  final Set<String> selected;
+  final Future<void> Function(Category category) onDelete;
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.read<CategoryListNotifier>();
+    final auth = context.watch<AuthNotifier>();
+
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: items.length,
@@ -350,61 +339,42 @@ class _CategoryCards extends StatelessWidget {
         final c = items[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 6),
-          color: c.isDeleted
-              ? Theme.of(context).colorScheme.errorContainer
-                    .withValues(alpha: 0.35)
-              : null,
           child: ListTile(
-            dense: true,
             leading: Checkbox(
               value: selected.contains(c.id),
               onChanged: (_) => notifier.toggleSelection(c.id),
             ),
             title: Text(c.name),
-            subtitle: c.description.isEmpty ? null : Text(c.description),
-            onTap: () => context.push('/categories/${c.id}'),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) async {
-                switch (value) {
-                  case 'edit':
-                    context.push('/categories/${c.id}/edit');
-                  case 'soft':
-                    await notifier.softDelete(c.id);
-                  case 'hard':
-                    await notifier.hardDelete(c.id);
-                  case 'restore':
-                    await notifier.restore(c.id);
-                }
-              },
-              itemBuilder: (context) {
-                final auth = context.watch<AuthNotifier>();
-                return [
-                  if (!c.isDeleted) ...[
-                    const PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                    const PopupMenuItem(
-                      value: 'soft',
-                      child: Text('Удалить логически'),
-                    ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ] else ...[
-                    if (auth.canRestore)
-                      const PopupMenuItem(
-                        value: 'restore',
-                        child: Text('Восстановить'),
-                      ),
-                    if (auth.canHardDelete)
-                      const PopupMenuItem(
-                        value: 'hard',
-                        child: Text('Удалить навсегда'),
-                      ),
-                  ],
-                ];
-              },
+            subtitle: Text(
+              c.description.isEmpty ? 'Описание не указано' : c.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
+            onTap: () => context.push('/categories/${c.id}'),
+            trailing: auth.canEditCatalog || auth.canHardDelete
+                ? PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      switch (value) {
+                        case 'edit':
+                          context.push('/categories/${c.id}/edit');
+                        case 'delete':
+                          await onDelete(c);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (auth.canEditCatalog)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Изменить'),
+                        ),
+                      if (auth.canHardDelete)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Удалить'),
+                        ),
+                    ],
+                  )
+                : null,
           ),
         );
       },

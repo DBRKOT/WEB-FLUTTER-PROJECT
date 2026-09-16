@@ -17,7 +17,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
   bool _submitting = false;
@@ -25,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _submitting = true);
     try {
       await context.read<AuthNotifier>().login(
-        username: _usernameController.text,
+        email: _emailController.text,
         password: _passwordController.text,
       );
       if (!mounted) return;
@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
           constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
             margin: const EdgeInsets.all(24),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
@@ -91,15 +91,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
-                      controller: _usernameController,
+                      controller: _emailController,
                       decoration: const InputDecoration(
-                        labelText: 'Логин',
+                        labelText: 'Электронная почта',
                         border: OutlineInputBorder(),
                       ),
+                      keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: V.combine([
-                        V.required('Введите логин'),
-                        V.length(min: 3),
+                        V.required('Введите адрес почты'),
+                        V.email(),
                       ]),
                     ),
                     const SizedBox(height: 16),
@@ -153,7 +154,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Учебные учётки: admin/admin123, manager/manager123, client/client123',
+                      'Учебные учётки:\n'
+                      'client@tm.local / client123456\n'
+                      'manager@tm.local / manager123456\n'
+                      'admin@tm.local / admin123456',
                       style: Theme.of(context).textTheme.bodySmall,
                       textAlign: TextAlign.center,
                     ),
